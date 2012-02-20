@@ -1,0 +1,107 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.67])
+AC_INIT([pfwd], [0.1], [bhuisgen@hbis.fr], [pfwd], [http://blog.hbis.fr])
+AC_CONFIG_HEADER([config.h])
+AM_INIT_AUTOMAKE()
+
+# Options
+AC_ARG_ENABLE(debug,
+   AC_HELP_STRING([--enable-debug], [generate debug informations]),
+   debug=yes,
+   debug=no)
+
+# Checks for platforms
+AC_CANONICAL_HOST
+case "${host_os}" in
+   *darwin*)
+	LDFLAGS="$LDFLAGS -framework CoreServices"
+   ;;
+esac
+
+# Checks for programs.
+CFLAGS="$CFLAGS -Wall"
+
+AC_PROG_CC
+AM_PROG_CC_STDC
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_INSTALL
+
+AM_GNU_GETTEXT([external])
+AM_GNU_GETTEXT_VERSION([0.18.1])
+ALL_LINGUAS="en fr"
+
+# Checks for libraries.
+deps_modules="glib-2.0 >= 2.6.0 gthread-2.0 >= 2.6.0"
+PKG_CHECK_MODULES(DEPS, [$deps_modules])
+AC_SUBST(DEPS_CFLAGS)
+AC_SUBST(DEPS_LIBS)
+AC_CHECK_LIB([ev],[ev_sleep],[],[
+	echo "Error! Required library libev not found."
+	exit -1
+	])
+
+# Checks for header files.
+AC_CHECK_HEADERS([fcntl.h libintl.h locale.h syslog.h])
+AC_CHECK_HEADERS([arpa/inet.h netinet/in.h])
+
+# Checks for typedefs, structures, and compiler characteristics.
+AC_C_INLINE
+
+# Checks for library functions.
+AC_CHECK_FUNCS([atexit memset setlocale socket strcasecmp strdup strtol])
+AC_FUNC_FORK
+AC_FUNC_MALLOC
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+
+# Debug and release flags
+case "${debug}" in
+   yes)
+      CFLAGS="$CFLAGS -g3"
+      AC_DEFINE(DEBUG, [], [debug])
+      ;;
+   no)
+      CFLAGS="$CFLAGS -O1"
+      AC_DEFINE(NDEBUG, [], [nodebug])
+      ;;
+esac
+
+# Package directories
+if test "x${prefix}" = "xNONE"; then
+  PACKAGE_PREFIX_DIR="${ac_default_prefix}"
+  PACKAGE_DATA_DIR="${ac_default_prefix}/share/${PACKAGE}"
+  PACKAGE_DOC_DIR="${ac_default_prefix}/share/doc/${PACKAGE}"
+  PACKAGE_LOCALE_DIR="${ac_default_prefix}/share/locale"
+  PACKAGE_SYSCONF_DIR="${ac_default_prefix}/etc"
+else
+  PACKAGE_PREFIX_DIR="${prefix}"
+  PACKAGE_DATA_DIR="${prefix}/share/${PACKAGE}"
+  PACKAGE_DOC_DIR="${prefix}/share/doc/${PACKAGE}"
+  PACKAGE_LOCALE_DIR="${prefix}/share/locale"
+  PACKAGE_SYSCONF_DIR="${prefix}/etc"
+fi
+
+AC_SUBST(PWD, "$PWD")
+AC_SUBST(PACKAGE_PREFIX_DIR)
+AC_SUBST(PACKAGE_DATA_DIR)
+AC_SUBST(PACKAGE_DOC_DIR)
+AC_SUBST(PACKAGE_LOCALE_DIR)
+AC_SUBST(PACKAGE_SYSCONF_DIR)
+AC_DEFINE_UNQUOTED(PACKAGE_PREFIX_DIR, "${PACKAGE_PREFIX_DIR}", [package prefix])
+AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${PACKAGE_DATA_DIR}", [data directory])
+AC_DEFINE_UNQUOTED(PACKAGE_DOC_DIR, "${PACKAGE_DOC_DIR}", [doc directory])
+AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, "${PACKAGE_LOCALE_DIR}", [locale directory])
+AC_DEFINE_UNQUOTED(PACKAGE_SYSCONF_DIR, "${PACKAGE_SYSCONF_DIR}", [sysconf directory])
+
+# Generate Makefiles
+AC_CONFIG_FILES([
+	Makefile
+	src/Makefile
+    po/Makefile.in
+	doc/Makefile
+])
+
+AC_OUTPUT

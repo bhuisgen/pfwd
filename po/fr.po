@@ -1,0 +1,265 @@
+# Translation for the pfwd project
+# Copyright (C) YEAR Free Software Foundation, Inc.
+# This file is distributed under the same license as the PACKAGE package.
+# Boris HUISGEN <bhuisgen@hbis.fr>, 2011.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: pfwd 0.1\n"
+"Report-Msgid-Bugs-To: bhuisgen@hbis.fr\n"
+"POT-Creation-Date: 2012-02-21 00:31+0100\n"
+"PO-Revision-Date: 2011-04-16 12:12+0200\n"
+"Last-Translator: Boris HUISGEN <bhuisgen@hbis.fr>\n"
+"Language-Team: Français <fr@li.org>\n"
+"Language: fr\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/pfwd.c:135
+msgid "Error in config file"
+msgstr "Erreur dans le fichier de configuration"
+
+#: src/pfwd.c:154
+msgid "Error in config file, aborting reload"
+msgstr "Erreur dans le fichier de configuration, rechargement ignoré"
+
+#: src/pfwd.c:198
+#, fuzzy
+msgid "invalid listen address"
+msgstr "adresse source non valide"
+
+#: src/pfwd.c:217 src/pfwd.c:233
+#, fuzzy
+msgid "invalid IPv6 listen address"
+msgstr "adresse IPv6 source non valide"
+
+#: src/pfwd.c:263 src/pfwd.c:281
+#, fuzzy
+msgid "invalid IPv4 listen address"
+msgstr "adresse IPv4 source non valide"
+
+#: src/pfwd.c:306
+#, fuzzy
+msgid "invalid listen port"
+msgstr "port source non valide"
+
+#: src/pfwd.c:329
+#, fuzzy
+msgid "invalid forward address"
+msgstr "adresse source non valide"
+
+#: src/pfwd.c:346 src/pfwd.c:362
+#, fuzzy
+msgid "invalid IPv6 forward address"
+msgstr "adresse IPv6 source non valide"
+
+#: src/pfwd.c:379 src/pfwd.c:443
+#, fuzzy
+msgid "the addresses are not of the same family"
+msgstr "les adresses source et destination ne sont pas de la même famille"
+
+#: src/pfwd.c:407 src/pfwd.c:426
+#, fuzzy
+msgid "invalid IPv4 forward address"
+msgstr "adresse IPv4 source non valide"
+
+#: src/pfwd.c:467
+#, fuzzy
+msgid "invalid forward port"
+msgstr "port source non valide"
+
+#: src/pfwd.c:597
+#, fuzzy
+msgid "failed to initialize main event loop"
+msgstr "échec d'écoute de la socket client"
+
+#: src/pfwd.c:627
+#, fuzzy
+msgid "child event loop initialized"
+msgstr "Boucle d'évènements initialisée"
+
+#: src/pfwd.c:647 src/pfwd.c:692
+msgid "failed to create client socket"
+msgstr "échec de création de la socket client"
+
+#: src/pfwd.c:660 src/pfwd.c:705
+msgid "failed to bind client socket"
+msgstr "échec de liaison de la socket client"
+
+#: src/pfwd.c:667
+msgid "Failed to listen on client socket"
+msgstr "Echec d'écoute de la socket client"
+
+#: src/pfwd.c:713
+msgid "failed to listen on client socket"
+msgstr "échec d'écoute de la socket client"
+
+#: src/pfwd.c:725
+msgid "accept watcher created"
+msgstr "observateur d'acceptation créé"
+
+#: src/pfwd.c:730
+msgid "accept watcher started"
+msgstr "observeateur d'acceptation démarré"
+
+#: src/pfwd.c:735 src/pfwd.c:738
+msgid "socket is listening"
+msgstr "socket en écoute"
+
+#: src/pfwd.c:751
+#, fuzzy
+msgid "Exit main loop event"
+msgstr "Fin de la boucle d'évènements"
+
+#: src/pfwd.c:759 src/pfwd.c:794 src/pfwd.c:1010 src/pfwd.c:1025
+msgid "watcher stopped"
+msgstr "observateur stoppé"
+
+#: src/pfwd.c:765
+msgid "watcher cleaned"
+msgstr "observateur nettoyé"
+
+#: src/pfwd.c:769 src/pfwd.c:772
+msgid "socket closed"
+msgstr "socket fermée"
+
+#: src/pfwd.c:775
+msgid "child event loop destroyed"
+msgstr ""
+
+#: src/pfwd.c:779
+msgid "main event loop destroyed"
+msgstr ""
+
+#: src/pfwd.c:786
+msgid "new accept event"
+msgstr "nouvel évènement d'acceptation"
+
+#: src/pfwd.c:791 src/pfwd.c:1007
+msgid "no data found, ignoring event"
+msgstr "pas de données trouvées, évènement ignoré"
+
+#: src/pfwd.c:820 src/pfwd.c:892
+msgid "failed to accept new client"
+msgstr "échec d'acceptation du nouveau client"
+
+#: src/pfwd.c:828 src/pfwd.c:900
+msgid "failed to resolv client address"
+msgstr "échec de création de la socket client"
+
+#: src/pfwd.c:843 src/pfwd.c:915
+msgid "failed to create server socket"
+msgstr "échec de création de la socket serveur"
+
+#: src/pfwd.c:855 src/pfwd.c:927
+msgid "failed to bind server socket"
+msgstr "échec de liaison de la socket serveur"
+
+#: src/pfwd.c:870 src/pfwd.c:939
+msgid "failed to connect server socket"
+msgstr "échec de connexion de la socket serveur"
+
+#: src/pfwd.c:959
+msgid "client watcher created"
+msgstr "observateur client créé"
+
+#: src/pfwd.c:965
+msgid "client watcher started"
+msgstr "observateur client démarré"
+
+#: src/pfwd.c:978
+msgid "server watcher created"
+msgstr "observateur serveur créé"
+
+#: src/pfwd.c:984
+msgid "server watcher started"
+msgstr "observateur serveur démarré"
+
+#: src/pfwd.c:988 src/pfwd.c:992
+msgid "new client connection"
+msgstr "nouvelle connection client"
+
+#: src/pfwd.c:1000
+msgid "new read event"
+msgstr "nouvel évènement de lecture"
+
+#: src/pfwd.c:1018
+msgid "event data"
+msgstr "données de l'évènement"
+
+#: src/pfwd.c:1021
+msgid "bytes readed"
+msgstr "octets lus"
+
+#: src/pfwd.c:1034 src/pfwd.c:1039
+msgid "client connection closed"
+msgstr "connection client fermée"
+
+#: src/pfwd.c:1055
+msgid "bytes written"
+msgstr "octets écrits"
+
+#: src/pfwd.c:1083
+msgid "read configuration from file"
+msgstr "lire la configuration depuis le fichier"
+
+#: src/pfwd.c:1083
+msgid "file"
+msgstr "fichier"
+
+#: src/pfwd.c:1085
+msgid "set verbose output"
+msgstr "fixe le niveau de verbosité"
+
+#: src/pfwd.c:1087
+msgid "show version information"
+msgstr "affiche les informations de versions"
+
+#: src/pfwd.c:1127
+#, fuzzy
+msgid "SIGPIPE received, continuing execution"
+msgstr "SIGHUP reçu, rechargement de la configuration"
+
+#: src/pfwd.c:1133
+msgid "SIGHUP received, reloading configuration"
+msgstr "SIGHUP reçu, rechargement de la configuration"
+
+#: src/pfwd.c:1141
+msgid "SIGINT received, exiting"
+msgstr "SIGINT reçu, abandon de l'exécution"
+
+#: src/pfwd.c:1149
+msgid "SIGTERM received, exiting"
+msgstr "SIGHUP reçu, abandon de l'exécution"
+
+#: src/pfwd.c:1187
+msgid "stopped"
+msgstr "stoppé"
+
+#: src/pfwd.c:1294
+msgid "Failed to daemonize, error code"
+msgstr "Echec de démonisation, code d'erreur"
+
+#: src/pfwd.c:1305
+msgid "started"
+msgstr "démarré"
+
+#, fuzzy
+#~ msgid "Exit child loop event"
+#~ msgstr "Fin de la boucle d'évènements"
+
+#~ msgid "invalid destination address"
+#~ msgstr "adresse de destination invalide"
+
+#~ msgid "invalid IPv6 destination address"
+#~ msgstr "adresse IPv6 de destination invalide"
+
+#~ msgid "invalid IPv4 destination address"
+#~ msgstr "adresse IPv4 de destination invalide"
+
+#~ msgid "invalid destination port"
+#~ msgstr "port de destination non valide"
+
+#~ msgid "Error during execution"
+#~ msgstr "Erreur lors de l'exécution"
