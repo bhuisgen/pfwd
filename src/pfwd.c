@@ -54,7 +54,6 @@ typedef struct _pfw_t
   gushort listen_port;
   gchar *forward_ip;
   gushort forward_port;
-  GThreadPool *thread_pool;
   struct ev_loop *ev_loop;
   ev_io *w;
   gint fd;
