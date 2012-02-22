@@ -65,6 +65,8 @@
 #define CONFIG_KEY_PFW_BUFFER_DEFAULT           4096
 #define CONFIG_KEY_PFW_FORWARD                  "Forward"
 #define CONFIG_KEY_PFW_FORWARDPORT              "ForwardPort"
+#define CONFIG_KEY_PFW_ALLOW                    "Allow"
+#define CONFIG_KEY_PFW_DENY                     "Deny"
 
 typedef struct _application_t
 {

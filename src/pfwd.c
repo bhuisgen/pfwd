@@ -54,6 +54,8 @@ typedef struct _pfw_t
   gushort listen_port;
   gchar *forward_ip;
   gushort forward_port;
+  gchar **allow_ips;
+  gchar **deny_ips;
   struct ev_loop *ev_loop;
   ev_io *w;
   gint fd;
@@ -81,10 +83,10 @@ gboolean
 load_config();
 gboolean
 reload_config();
-logger_t *
-init_logger();
 GSList *
 init_pfwds();
+logger_t *
+init_logger();
 gboolean
 run_main_loop();
 gboolean
@@ -95,6 +97,8 @@ static void
 accept_event(EV_P_ ev_io *w, gint revents);
 static void
 read_event(EV_P_ ev_io *w, gint revents);
+gboolean
+pfwd_check_access(pfw_t *pfw, gchar *ip);
 void
 version();
 void
@@ -173,6 +177,7 @@ init_pfwds()
   GMatchInfo *match_info;
   gchar **groups;
   gint i;
+  gsize len;
 
   regex_ipv6 = g_regex_new("^\\[(.+)\\]$", 0, 0, NULL);
   regex_ipv4 = g_regex_new("^(\\d+\\.\\d+\\.\\d+\\.\\d+|\\*)$", 0, 0, NULL);
@@ -472,6 +477,12 @@ init_pfwds()
 
           return NULL;
         }
+
+      pfw->allow_ips = g_key_file_get_string_list(app->settings, pfw->name,
+          CONFIG_KEY_PFW_ALLOW, &len, NULL);
+
+      pfw->deny_ips = g_key_file_get_string_list(app->settings, pfw->name,
+          CONFIG_KEY_PFW_DENY, &len, NULL);
 
       list = g_slist_append(list, pfw);
     }
@@ -802,6 +813,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
     gint c, s;
     gchar c_ip[IPV6_MAXLEN];
     short c_port;
+    gchar *ip;
 
     if (pfw->af == AF_INET6)
       {
@@ -826,10 +838,29 @@ accept_event(EV_P_ ev_io *w, gint revents)
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to resolv client address"));
 
+            close(c);
+
             return;
           }
 
         c_port = htons(sin6.sin6_port);
+
+        ip = g_strdup_printf("[%s]", c_ip);
+        if (!pfwd_check_access(pfw, c_ip))
+          {
+            LOG_INFO(app->logger, "%s: %s (%s)",
+                pfw->name, N_("client address denied"), ip);
+
+            g_free(ip);
+            close(c);
+
+            return;
+          }
+
+        LOG_INFO(app->logger, "%s: %s (%s)",
+                        pfw->name, N_("client address allowed"), ip);
+
+        g_free(ip);
 
         fcntl(c, F_SETFL, O_NONBLOCK);
         opt = 0;
@@ -840,6 +871,8 @@ accept_event(EV_P_ ev_io *w, gint revents)
           {
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to create server socket"));
+
+            close(c);
 
             return;
           }
@@ -852,6 +885,9 @@ accept_event(EV_P_ ev_io *w, gint revents)
           {
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to bind server socket"));
+
+            close(s);
+            close(c);
 
             return;
           }
@@ -867,6 +903,9 @@ accept_event(EV_P_ ev_io *w, gint revents)
           {
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to connect server socket"));
+
+            close(s);
+            close(c);
 
             return;
           }
@@ -898,10 +937,29 @@ accept_event(EV_P_ ev_io *w, gint revents)
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to resolv client address"));
 
+            close(c);
+
             return;
           }
 
         c_port = htons(sin4.sin_port);
+
+        ip = g_strdup_printf("%s", c_ip);
+        if (!pfwd_check_access(pfw, c_ip))
+          {
+            LOG_INFO(app->logger, "%s: %s (%s)",
+                pfw->name, N_("client address denied"), ip);
+
+            g_free(ip);
+            close(c);
+
+            return;
+          }
+
+        LOG_INFO(app->logger, "%s: %s (%s)",
+                        pfw->name, N_("client address allowed"), ip);
+
+        g_free(ip);
 
         fcntl(c, F_SETFL, O_NONBLOCK);
         opt = 0;
@@ -912,6 +970,8 @@ accept_event(EV_P_ ev_io *w, gint revents)
           {
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to create server socket"));
+
+            close(c);
 
             return;
           }
@@ -925,6 +985,9 @@ accept_event(EV_P_ ev_io *w, gint revents)
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to bind server socket"));
 
+            close(s);
+            close(c);
+
             return;
           }
 
@@ -936,6 +999,9 @@ accept_event(EV_P_ ev_io *w, gint revents)
           {
             LOG_ERROR(app->logger, "%s: %s",
                 pfw->name, N_("failed to connect server socket"));
+
+            close(s);
+            close(c);
 
             return;
           }
@@ -1053,6 +1119,59 @@ read_event(EV_P_ ev_io *w, gint revents)
     n = write(pfw_io->c_fd, pfw_io->buf, n);
   LOG_DEBUG(app->logger, "%s: %s=%d", pfw_io->pfw->name, N_("bytes written"),
       n);
+}
+
+gboolean
+pfwd_check_access(pfw_t *pfw, gchar *ip)
+{
+  gboolean deny = FALSE;
+  gboolean allow = FALSE;
+  gint i;
+
+  if (pfw->deny_ips)
+    {
+      deny = TRUE;
+
+      for (i = 0; pfw->deny_ips[i] != NULL; i++)
+        {
+          if (g_pattern_match_simple(pfw->deny_ips[i], ip))
+            {
+              LOG_DEBUG(app->logger, "%s (%s)",
+                  N_("address matches deny rule"), ip);
+
+              return FALSE;
+            }
+        }
+    }
+
+  if (pfw->allow_ips)
+    {
+      allow = TRUE;
+
+      for (i = 0; pfw->allow_ips[i] != NULL; i++)
+        {
+          if (g_pattern_match_simple(pfw->allow_ips[i], ip))
+            {
+              LOG_DEBUG(app->logger, "%s (%s)",
+                  N_("address matches allow rule"), ip);
+
+              return TRUE;
+            }
+        }
+    }
+
+  if (allow)
+    {
+      LOG_DEBUG(app->logger, "%s (%s)",
+          N_("address matches default deny rule"), ip);
+
+      return FALSE;
+    }
+
+  LOG_DEBUG(app->logger, "%s (%s)",
+      N_("address matches default allow rule"), ip);
+
+  return TRUE;
 }
 
 void
@@ -1204,6 +1323,8 @@ cleanup(void)
               g_free(pfw->name);
               g_free(pfw->listen_ip);
               g_free(pfw->forward_ip);
+              g_strfreev(pfw->allow_ips);
+              g_strfreev(pfw->deny_ips);
               g_free(pfw);
             }
 
