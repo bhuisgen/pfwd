@@ -1,2 +1,8 @@
-2011-04-16  gettextize  <bug-gnu-gettext@gnu.org>
+2012-02-22 Boris HUISGEN <bhuisgen@hbis.fr>
+
+	* pfwd.c: add allow/deny rules support.
+	* pfwd.c: fix close sockets on error.
+
+2011-04-16 Boris HUISGEN <bhuisgen@hbis.fr>
+
 	* [RELEASE] version 0.1

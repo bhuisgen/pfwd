@@ -116,32 +116,38 @@
 /* nodebug */
 #undef NDEBUG
 
+/* BSD */
+#undef OS_BSD
+
+/* Darwin */
+#undef OS_DARWIN
+
+/* FreeBSD */
+#undef OS_FREEBSD
+
+/* Linux */
+#undef OS_LINUX
+
+/* NetBSD */
+#undef OS_NETBSD
+
+/* OpenBSD */
+#undef OS_OPENBSD
+
+/* UNIX */
+#undef OS_UNIX
+
 /* Name of package */
 #undef PACKAGE
 
 /* Define to the address where bug reports for this package should be sent. */
 #undef PACKAGE_BUGREPORT
 
-/* data directory */
-#undef PACKAGE_DATA_DIR
-
-/* doc directory */
-#undef PACKAGE_DOC_DIR
-
-/* locale directory */
-#undef PACKAGE_LOCALE_DIR
-
 /* Define to the full name of this package. */
 #undef PACKAGE_NAME
 
-/* package prefix */
-#undef PACKAGE_PREFIX_DIR
-
 /* Define to the full name and version of this package. */
 #undef PACKAGE_STRING
-
-/* sysconf directory */
-#undef PACKAGE_SYSCONF_DIR
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME

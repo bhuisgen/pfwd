@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pfwd 0.1\n"
 "Report-Msgid-Bugs-To: bhuisgen@hbis.fr\n"
-"POT-Creation-Date: 2012-02-21 00:31+0100\n"
+"POT-Creation-Date: 2012-02-26 17:56+0100\n"
 "PO-Revision-Date: 2011-04-16 12:12+0200\n"
 "Last-Translator: Boris HUISGEN <bhuisgen@hbis.fr>\n"
 "Language-Team: English <en@li.org>\n"
@@ -16,218 +16,259 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/pfwd.c:135
-msgid "Error in config file"
+#: src/pfwd.c:151 src/pfwd.c:162 src/pfwd.c:170 src/pfwd.c:209 src/pfwd.c:220
+#: src/pfwd.c:255
+msgid "error in config file"
 msgstr ""
 
-#: src/pfwd.c:154
-msgid "Error in config file, aborting reload"
+#: src/pfwd.c:163 src/pfwd.c:209
+msgid "no group 'main'"
 msgstr ""
 
-#: src/pfwd.c:198
+#: src/pfwd.c:171 src/pfwd.c:220
+msgid "the first group is not 'main'"
+msgstr ""
+
+#: src/pfwd.c:196
+msgid "error in config file, aborting reload"
+msgstr ""
+
+#: src/pfwd.c:256
+msgid "no redirection group"
+msgstr ""
+
+#: src/pfwd.c:279
 msgid "invalid listen address"
 msgstr ""
 
-#: src/pfwd.c:217 src/pfwd.c:233
+#: src/pfwd.c:298 src/pfwd.c:314
 msgid "invalid IPv6 listen address"
 msgstr ""
 
-#: src/pfwd.c:263 src/pfwd.c:281
+#: src/pfwd.c:344 src/pfwd.c:362
 msgid "invalid IPv4 listen address"
 msgstr ""
 
-#: src/pfwd.c:306
+#: src/pfwd.c:387
 msgid "invalid listen port"
 msgstr ""
 
-#: src/pfwd.c:329
+#: src/pfwd.c:410
 msgid "invalid forward address"
 msgstr ""
 
-#: src/pfwd.c:346 src/pfwd.c:362
+#: src/pfwd.c:427 src/pfwd.c:443
 msgid "invalid IPv6 forward address"
 msgstr ""
 
-#: src/pfwd.c:379 src/pfwd.c:443
+#: src/pfwd.c:460 src/pfwd.c:524
 msgid "the addresses are not of the same family"
 msgstr ""
 
-#: src/pfwd.c:407 src/pfwd.c:426
+#: src/pfwd.c:488 src/pfwd.c:507
 msgid "invalid IPv4 forward address"
 msgstr ""
 
-#: src/pfwd.c:467
+#: src/pfwd.c:548
 msgid "invalid forward port"
 msgstr ""
 
-#: src/pfwd.c:597
+#: src/pfwd.c:684
 msgid "failed to initialize main event loop"
 msgstr ""
 
-#: src/pfwd.c:627
+#: src/pfwd.c:713
 msgid "child event loop initialized"
 msgstr ""
 
-#: src/pfwd.c:647 src/pfwd.c:692
+#: src/pfwd.c:732 src/pfwd.c:775
 msgid "failed to create client socket"
 msgstr ""
 
-#: src/pfwd.c:660 src/pfwd.c:705
+#: src/pfwd.c:744 src/pfwd.c:787
 msgid "failed to bind client socket"
 msgstr ""
 
-#: src/pfwd.c:667
+#: src/pfwd.c:751
 msgid "Failed to listen on client socket"
 msgstr ""
 
-#: src/pfwd.c:713
+#: src/pfwd.c:795
 msgid "failed to listen on client socket"
 msgstr ""
 
-#: src/pfwd.c:725
+#: src/pfwd.c:806
 msgid "accept watcher created"
 msgstr ""
 
-#: src/pfwd.c:730
+#: src/pfwd.c:810
 msgid "accept watcher started"
 msgstr ""
 
-#: src/pfwd.c:735 src/pfwd.c:738
+#: src/pfwd.c:814 src/pfwd.c:817
 msgid "socket is listening"
 msgstr ""
 
-#: src/pfwd.c:751
-msgid "Exit main loop event"
+#: src/pfwd.c:830
+msgid "exit main loop event"
 msgstr ""
 
-#: src/pfwd.c:759 src/pfwd.c:794 src/pfwd.c:1010 src/pfwd.c:1025
+#: src/pfwd.c:837 src/pfwd.c:871 src/pfwd.c:1142 src/pfwd.c:1157
 msgid "watcher stopped"
 msgstr ""
 
-#: src/pfwd.c:765
+#: src/pfwd.c:842
 msgid "watcher cleaned"
 msgstr ""
 
-#: src/pfwd.c:769 src/pfwd.c:772
+#: src/pfwd.c:846 src/pfwd.c:849
 msgid "socket closed"
 msgstr ""
 
-#: src/pfwd.c:775
+#: src/pfwd.c:852
 msgid "child event loop destroyed"
 msgstr ""
 
-#: src/pfwd.c:779
+#: src/pfwd.c:856
 msgid "main event loop destroyed"
 msgstr ""
 
-#: src/pfwd.c:786
+#: src/pfwd.c:863
 msgid "new accept event"
 msgstr ""
 
-#: src/pfwd.c:791 src/pfwd.c:1007
+#: src/pfwd.c:868 src/pfwd.c:1139
 msgid "no data found, ignoring event"
 msgstr ""
 
-#: src/pfwd.c:820 src/pfwd.c:892
+#: src/pfwd.c:898 src/pfwd.c:997
 msgid "failed to accept new client"
 msgstr ""
 
-#: src/pfwd.c:828 src/pfwd.c:900
+#: src/pfwd.c:906 src/pfwd.c:1005
 msgid "failed to resolv client address"
 msgstr ""
 
-#: src/pfwd.c:843 src/pfwd.c:915
+#: src/pfwd.c:919 src/pfwd.c:1018
+msgid "client address denied"
+msgstr ""
+
+#: src/pfwd.c:928 src/pfwd.c:1027
+msgid "client address allowed"
+msgstr ""
+
+#: src/pfwd.c:940 src/pfwd.c:1039
 msgid "failed to create server socket"
 msgstr ""
 
-#: src/pfwd.c:855 src/pfwd.c:927
+#: src/pfwd.c:954 src/pfwd.c:1053
 msgid "failed to bind server socket"
 msgstr ""
 
-#: src/pfwd.c:870 src/pfwd.c:939
+#: src/pfwd.c:972 src/pfwd.c:1068
 msgid "failed to connect server socket"
 msgstr ""
 
-#: src/pfwd.c:959
+#: src/pfwd.c:1091
 msgid "client watcher created"
 msgstr ""
 
-#: src/pfwd.c:965
+#: src/pfwd.c:1097
 msgid "client watcher started"
 msgstr ""
 
-#: src/pfwd.c:978
+#: src/pfwd.c:1110
 msgid "server watcher created"
 msgstr ""
 
-#: src/pfwd.c:984
+#: src/pfwd.c:1116
 msgid "server watcher started"
 msgstr ""
 
-#: src/pfwd.c:988 src/pfwd.c:992
+#: src/pfwd.c:1120 src/pfwd.c:1124
 msgid "new client connection"
 msgstr ""
 
-#: src/pfwd.c:1000
+#: src/pfwd.c:1132
 msgid "new read event"
 msgstr ""
 
-#: src/pfwd.c:1018
+#: src/pfwd.c:1150
 msgid "event data"
 msgstr ""
 
-#: src/pfwd.c:1021
+#: src/pfwd.c:1153
 msgid "bytes readed"
 msgstr ""
 
-#: src/pfwd.c:1034 src/pfwd.c:1039
+#: src/pfwd.c:1166 src/pfwd.c:1171
 msgid "client connection closed"
 msgstr ""
 
-#: src/pfwd.c:1055
+#: src/pfwd.c:1187
 msgid "bytes written"
 msgstr ""
 
-#: src/pfwd.c:1083
+#: src/pfwd.c:1206
+msgid "address matches deny rule"
+msgstr ""
+
+#: src/pfwd.c:1221
+msgid "address matches allow rule"
+msgstr ""
+
+#: src/pfwd.c:1230
+msgid "address matches default deny rule"
+msgstr ""
+
+#: src/pfwd.c:1235
+msgid "address matches default allow rule"
+msgstr ""
+
+#: src/pfwd.c:1264
 msgid "read configuration from file"
 msgstr ""
 
-#: src/pfwd.c:1083
+#: src/pfwd.c:1264
 msgid "file"
 msgstr ""
 
-#: src/pfwd.c:1085
+#: src/pfwd.c:1266
 msgid "set verbose output"
 msgstr ""
 
-#: src/pfwd.c:1087
+#: src/pfwd.c:1268
 msgid "show version information"
 msgstr ""
 
-#: src/pfwd.c:1127
+#: src/pfwd.c:1308
 msgid "SIGPIPE received, continuing execution"
 msgstr ""
 
-#: src/pfwd.c:1133
+#: src/pfwd.c:1314
 msgid "SIGHUP received, reloading configuration"
 msgstr ""
 
-#: src/pfwd.c:1141
+#: src/pfwd.c:1322
 msgid "SIGINT received, exiting"
 msgstr ""
 
-#: src/pfwd.c:1149
+#: src/pfwd.c:1330
 msgid "SIGTERM received, exiting"
 msgstr ""
 
-#: src/pfwd.c:1187
-msgid "stopped"
+#: src/pfwd.c:1360
+msgid "daemon stopped"
 msgstr ""
 
-#: src/pfwd.c:1294
-msgid "Failed to daemonize, error code"
+#: src/pfwd.c:1421
+msgid "failed to create logger"
 msgstr ""
 
-#: src/pfwd.c:1305
-msgid "started"
+#: src/pfwd.c:1455
+msgid "failed to daemonize, error code"
+msgstr ""
+
+#: src/pfwd.c:1461
+msgid "daemon started"
 msgstr ""

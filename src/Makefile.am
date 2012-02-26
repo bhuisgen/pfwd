@@ -1,12 +1,19 @@
+prefix = @prefix@
 datadir = @datadir@
+docdir = @docdir@
 localedir = $(datadir)/locale
+sysconfdir = @sysconfdir@
 
-DEFS = -DLOCALEDIR=\"$(localedir)\" @DEFS@
+DEFS = \
+	-DPREFIX=\"$(prefix)\" \
+	-DLOCALEDIR=\"$(localedir)\" \
+	-DSYSCONFDIR=\"$(sysconfdir)\" \
+	@DEFS@
 
 INCLUDES = \
 	${DEPS_CFLAGS}
 
-bin_PROGRAMS = \
+sbin_PROGRAMS = \
 	pfwd
 
 noinst_HEADERS = \
@@ -30,7 +37,7 @@ pfwd_SOURCES = \
 	utils.c
 
 pfwd_LDADD = \
-        $(DEPS_LIBS) \
+    $(DEPS_LIBS) \
 	$(INTLLIBS)
 
 EXTRA_DIST = \

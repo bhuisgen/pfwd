@@ -34,12 +34,12 @@
 #include <string.h>
 #include <unistd.h>
 
-#define LOG_ERROR(logger, _fmt, ...)    log_message(logger, LOG_LEVEL_ERROR, _fmt, __VA_ARGS__)
-#define LOG_INFO(logger, _fmt, ...)     log_message(logger, LOG_LEVEL_INFO, _fmt, __VA_ARGS__)
+#define LOG_ERROR(_fmt, ...)    log_message(app->logger, LOG_LEVEL_ERROR, _fmt, __VA_ARGS__)
+#define LOG_INFO(_fmt, ...)     log_message(app->logger, LOG_LEVEL_INFO, _fmt, __VA_ARGS__)
 #ifdef DEBUG
-#define LOG_DEBUG(logger, _fmt, ...)    log_message(logger, LOG_LEVEL_DEBUG, _fmt, __VA_ARGS__)
+#define LOG_DEBUG(_fmt, ...)    log_message(app->logger, LOG_LEVEL_DEBUG, _fmt, __VA_ARGS__)
 #else
-#define LOG_DEBUG(logger, _fmt, ...)
+#define LOG_DEBUG(_fmt, ...)
 #endif
 
 #define IPV4_ANY                        "*"
@@ -62,7 +62,6 @@ typedef struct _pfw_t
   gint af;
   gint backlog;
   gint buf_size;
-
 } pfw_t;
 
 typedef struct _pfw_io_t
@@ -117,10 +116,23 @@ cleanup(void);
 gchar*
 get_default_config_file()
 {
+  const gchar *homedir;
   gchar* config_file;
 
-  config_file = g_build_path(G_DIR_SEPARATOR_S, PACKAGE_SYSCONF_DIR,
+  homedir = g_getenv("HOME");
+  if (!homedir)
+    homedir = g_get_home_dir();
+
+  config_file = g_build_path(G_DIR_SEPARATOR_S, homedir, PFWD_HOMEDIR,
       PFWD_CONFIGFILE, NULL);
+
+  if (!g_file_test(config_file, G_FILE_TEST_EXISTS | G_FILE_TEST_IS_REGULAR))
+    {
+      g_free(config_file);
+
+      config_file = g_build_path(G_DIR_SEPARATOR_S, SYSCONFDIR,
+          PFWD_CONFIGFILE, NULL);
+    }
 
   return config_file;
 }
@@ -129,18 +141,41 @@ gboolean
 load_config()
 {
   GError *error = NULL;
+  gchar *group;
 
   app->settings = g_key_file_new();
 
   if (!g_key_file_load_from_file(app->settings, app->config_file,
       G_KEY_FILE_NONE, &error))
     {
-      g_printerr("%s: %s\n", N_("Error in config file"), error->message);
+      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
+          error->message);
 
       return FALSE;
     }
 
   g_key_file_set_list_separator(app->settings, ',');
+
+  group = g_key_file_get_start_group(app->settings);
+  if (!group)
+    {
+      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
+          N_("no group 'main'"));
+
+      return FALSE;
+    }
+
+  if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
+    {
+      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
+          N_("the first group is not 'main'"));
+
+      g_free(group);
+
+      return FALSE;
+    }
+
+  g_free(group);
 
   return TRUE;
 }
@@ -149,17 +184,48 @@ gboolean
 reload_config()
 {
   GKeyFile *settings;
+  GError *error = NULL;
+  gchar *group;
 
   settings = g_key_file_new();
   if (!g_key_file_load_from_file(settings, app->config_file, G_KEY_FILE_NONE,
-      NULL))
+      &error))
     {
-      LOG_ERROR(app->logger, "%s", N_("Error in config file, aborting reload"));
+      LOG_ERROR(
+          "%s: %s (%s)\n",
+          app->config_file, N_("error in config file, aborting reload"), error->message);
+
+      g_key_file_free(settings);
 
       return FALSE;
     }
 
   g_key_file_set_list_separator(settings, ',');
+
+  group = g_key_file_get_start_group(settings);
+  if (!group)
+    {
+      LOG_ERROR("%s: %s (%s)\n",
+          app->config_file, N_("error in config file"), N_("no group 'main'"));
+
+      g_key_file_free(settings);
+
+      return FALSE;
+    }
+
+  if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
+    {
+      LOG_ERROR(
+          "%s: %s (%s)\n",
+          app->config_file, N_("error in config file"), N_("the first group is not 'main'"));
+
+      g_free(group);
+      g_key_file_free(settings);
+
+      return FALSE;
+    }
+
+  g_free(group);
 
   if (app->settings)
     g_key_file_free(app->settings);
@@ -176,14 +242,25 @@ init_pfwds()
   GRegex *regex_ipv6, *regex_ipv4;
   GMatchInfo *match_info;
   gchar **groups;
-  gint i;
   gsize len;
+  gint i;
 
   regex_ipv6 = g_regex_new("^\\[(.+)\\]$", 0, 0, NULL);
   regex_ipv4 = g_regex_new("^(\\d+\\.\\d+\\.\\d+\\.\\d+|\\*)$", 0, 0, NULL);
 
-  groups = g_key_file_get_groups(app->settings, NULL);
-  for (i = 0; groups[i] != NULL; i++)
+  groups = g_key_file_get_groups(app->settings, &len);
+
+  if (len < 2)
+    {
+      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
+          N_("no redirection group"));
+
+      g_strfreev(groups);
+
+      return NULL;
+    }
+
+  for (i = 0; i < len; i++)
     {
       if (g_strcmp0(groups[i], CONFIG_GROUP_MAIN) == 0)
         continue;
@@ -479,10 +556,10 @@ init_pfwds()
         }
 
       pfw->allow_ips = g_key_file_get_string_list(app->settings, pfw->name,
-          CONFIG_KEY_PFW_ALLOW, &len, NULL);
+          CONFIG_KEY_PFW_ALLOW, NULL, NULL);
 
       pfw->deny_ips = g_key_file_get_string_list(app->settings, pfw->name,
-          CONFIG_KEY_PFW_DENY, &len, NULL);
+          CONFIG_KEY_PFW_DENY, NULL, NULL);
 
       list = g_slist_append(list, pfw);
     }
@@ -604,7 +681,7 @@ run_main_loop()
   loop = ev_default_loop(EVFLAG_AUTO);
   if (!loop)
     {
-      LOG_ERROR(app->logger, "%s", N_("failed to initialize main event loop"));
+      LOG_ERROR("%s", N_("failed to initialize main event loop"));
 
       return FALSE;
     };
@@ -628,13 +705,12 @@ run_child_loop(pfw_t *pfw)
   pfw->ev_loop = ev_loop_new(EVFLAG_AUTO);
   if (!pfw->ev_loop)
     {
-      LOG_ERROR(app->logger, "%s: %s",
-          pfw->name, "failed to initialize child event loop");
+      LOG_ERROR("%s: %s", pfw->name, "failed to initialize child event loop");
 
       return FALSE;
     };
 
-  LOG_DEBUG(app->logger, "%s: %s", pfw->name, N_("child event loop initialized"));
+  LOG_DEBUG("%s: %s", pfw->name, N_("child event loop initialized"));
 
   if (pfw->af == AF_INET6)
     {
@@ -653,8 +729,7 @@ run_child_loop(pfw_t *pfw)
       pfw->fd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
       if (pfw->fd < 0)
         {
-          LOG_ERROR(app->logger, "%s: %s",
-              pfw->name, N_("failed to create client socket"));
+          LOG_ERROR("%s: %s", pfw->name, N_("failed to create client socket"));
 
           return FALSE;
         }
@@ -666,15 +741,14 @@ run_child_loop(pfw_t *pfw)
       if (bind(pfw->fd, (struct sockaddr *) &saddr6,
           sizeof(struct sockaddr_in6)) < 0)
         {
-          LOG_ERROR(app->logger, "%s: %s",
-              pfw->name, N_("failed to bind client socket"));
+          LOG_ERROR("%s: %s", pfw->name, N_("failed to bind client socket"));
 
           return FALSE;
         }
 
       if (listen(pfw->fd, pfw->backlog) < 0)
         {
-          LOG_ERROR(app->logger, "%s", N_("Failed to listen on client socket"));
+          LOG_ERROR("%s", N_("Failed to listen on client socket"));
 
           return FALSE;
         }
@@ -698,8 +772,7 @@ run_child_loop(pfw_t *pfw)
       pfw->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
       if (pfw->fd < 0)
         {
-          LOG_ERROR(app->logger, "%s: %s",
-              pfw->name, N_("failed to create client socket"));
+          LOG_ERROR("%s: %s", pfw->name, N_("failed to create client socket"));
 
           return FALSE;
         }
@@ -711,15 +784,14 @@ run_child_loop(pfw_t *pfw)
       if (bind(pfw->fd, (struct sockaddr *) &saddr4, sizeof(struct sockaddr_in))
           < 0)
         {
-          LOG_ERROR(app->logger, "%s: %s",
-              pfw->name, N_("failed to bind client socket"));
+          LOG_ERROR("%s: %s", pfw->name, N_("failed to bind client socket"));
 
           return FALSE;
         }
 
       if (listen(pfw->fd, pfw->backlog) < 0)
         {
-          LOG_ERROR(app->logger, "%s: %s",
+          LOG_ERROR("%s: %s",
               pfw->name, N_("failed to listen on client socket"));
 
           return FALSE;
@@ -731,20 +803,17 @@ run_child_loop(pfw_t *pfw)
   pfw->w = g_new0(ev_io, 1);
   pfw->w->data = pfw;
   ev_io_init(pfw->w, accept_event, pfw->fd, EV_READ);
-  LOG_DEBUG(app->logger, "%s: %s (pfw=%p)",
-      pfw->name, N_("accept watcher created"), pfw);
+  LOG_DEBUG("%s: %s (pfw=%p)", pfw->name, N_("accept watcher created"), pfw);
 
   ev_io_start(pfw->ev_loop, pfw->w);
-  LOG_DEBUG(app->logger,
-      "%s: %s (fd=%d, event=EV_READ, data=%p)",
-      pfw->name, N_("accept watcher started"),
-      pfw->w->fd, pfw->w->data);
+  LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
+      pfw->name, N_("accept watcher started"), pfw->w->fd, pfw->w->data);
 
   if (pfw->af == AF_INET6)
-    LOG_INFO(app->logger, "%s: %s ([%s]:%hu)",
+    LOG_INFO("%s: %s ([%s]:%hu)",
         pfw->name, N_("socket is listening"), pfw->listen_ip, pfw->listen_port);
   else
-    LOG_INFO(app->logger, "%s: %s (%s:%hu)",
+    LOG_INFO("%s: %s (%s:%hu)",
         pfw->name, N_("socket is listening"), pfw->listen_ip, pfw->listen_port);
 
   ev_loop(pfw->ev_loop, 0);
@@ -758,50 +827,48 @@ exit_main_loop(void)
   GSList *item;
   pfw_t *pfw;
 
-  LOG_DEBUG(app->logger, "%s", N_("Exit main loop event"));
+  LOG_DEBUG("%s", N_("exit main loop event"));
 
   for (item = app->pfwds; item; item = item->next)
     {
       pfw = (pfw_t *) item->data;
 
       ev_io_stop(pfw->ev_loop, pfw->w);
-      LOG_DEBUG(app->logger, "%s: %s",
-          pfw->name, N_("watcher stopped"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("watcher stopped"));
 
       close(pfw->fd);
 
       g_free(pfw->w);
-      LOG_DEBUG(app->logger, "%s: %s",
-          pfw->name, N_("watcher cleaned"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("watcher cleaned"));
 
       if (pfw->af == AF_INET6)
-        LOG_INFO(app->logger, "%s: %s [%s]:%hu",
+        LOG_INFO("%s: %s [%s]:%hu",
             pfw->name, N_("socket closed"), pfw->listen_ip, pfw->listen_port);
       else
-        LOG_INFO(app->logger, "%s: %s %s:%hu",
+        LOG_INFO("%s: %s %s:%hu",
             pfw->name, N_("socket closed"), pfw->listen_ip, pfw->listen_port);
 
       ev_loop_destroy(pfw->ev_loop);
-      LOG_DEBUG (app->logger, "%s: %s", pfw->name, N_("child event loop destroyed"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("child event loop destroyed"));
     }
 
   ev_loop_destroy(EV_DEFAULT_UC);
-  LOG_DEBUG(app->logger, "%s", N_("main event loop destroyed"));
+  LOG_DEBUG("%s", N_("main event loop destroyed"));
 }
 
 static void
 accept_event(EV_P_ ev_io *w, gint revents)
   {
-    LOG_DEBUG(app->logger, "%s (fd=%d, data=%p)",
+    LOG_DEBUG("%s (fd=%d, data=%p)",
         N_("new accept event"), w->fd,w->data);
 
     pfw_t *pfw = (pfw_t *)w->data;
     if (pfw == NULL)
       {
-        LOG_ERROR(app->logger, "%s", N_("no data found, ignoring event"));
+        LOG_ERROR("%s", N_("no data found, ignoring event"));
 
         ev_io_stop(EV_DEFAULT_UC, w);
-        LOG_DEBUG(app->logger, "%s", N_("watcher stopped"));
+        LOG_DEBUG("%s", N_("watcher stopped"));
 
         g_free(w);
 
@@ -827,7 +894,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         c = accept(w->fd, (struct sockaddr *) &sin6, &len);
         if (c < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to accept new client"));
 
             return;
@@ -835,7 +902,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
 
         if (!inet_ntop(AF_INET6, &sin6.sin6_addr, c_ip, sizeof(c_ip)))
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to resolv client address"));
 
             close(c);
@@ -848,7 +915,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         ip = g_strdup_printf("[%s]", c_ip);
         if (!pfwd_check_access(pfw, c_ip))
           {
-            LOG_INFO(app->logger, "%s: %s (%s)",
+            LOG_INFO("%s: %s (%s)",
                 pfw->name, N_("client address denied"), ip);
 
             g_free(ip);
@@ -857,8 +924,8 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        LOG_INFO(app->logger, "%s: %s (%s)",
-                        pfw->name, N_("client address allowed"), ip);
+        LOG_INFO("%s: %s (%s)",
+            pfw->name, N_("client address allowed"), ip);
 
         g_free(ip);
 
@@ -869,7 +936,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         s = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
         if (s < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to create server socket"));
 
             close(c);
@@ -883,7 +950,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
 
         if (bind(s, (struct sockaddr *) &sin6, sizeof(struct sockaddr_in6)) < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to bind server socket"));
 
             close(s);
@@ -901,7 +968,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (connect(s, (struct sockaddr *) &sin6,
                 sizeof(struct sockaddr_in6)) < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to connect server socket"));
 
             close(s);
@@ -926,7 +993,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         c = accept(w->fd, (struct sockaddr *) &sin4, &len);
         if (c < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to accept new client"));
 
             return;
@@ -934,7 +1001,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
 
         if (!inet_ntop(AF_INET, &sin4.sin_addr, c_ip, sizeof(c_ip)))
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to resolv client address"));
 
             close(c);
@@ -947,7 +1014,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         ip = g_strdup_printf("%s", c_ip);
         if (!pfwd_check_access(pfw, c_ip))
           {
-            LOG_INFO(app->logger, "%s: %s (%s)",
+            LOG_INFO("%s: %s (%s)",
                 pfw->name, N_("client address denied"), ip);
 
             g_free(ip);
@@ -956,8 +1023,8 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        LOG_INFO(app->logger, "%s: %s (%s)",
-                        pfw->name, N_("client address allowed"), ip);
+        LOG_INFO("%s: %s (%s)",
+            pfw->name, N_("client address allowed"), ip);
 
         g_free(ip);
 
@@ -968,7 +1035,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (s < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to create server socket"));
 
             close(c);
@@ -982,7 +1049,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
 
         if (bind(s, (struct sockaddr *) &sin4, sizeof(struct sockaddr_in)) < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to bind server socket"));
 
             close(s);
@@ -997,7 +1064,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (connect(s, (struct sockaddr *) &sin4, sizeof(struct sockaddr_in))
             < 0)
           {
-            LOG_ERROR(app->logger, "%s: %s",
+            LOG_ERROR("%s: %s",
                 pfw->name, N_("failed to connect server socket"));
 
             close(s);
@@ -1020,13 +1087,13 @@ accept_event(EV_P_ ev_io *w, gint revents)
     c_data->c_port = c_port;
     c_data->s_fd = s;
     c_data->buf = g_new0(gchar, pfw->buf_size);
-    LOG_DEBUG(app->logger, "%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
+    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
         pfw->name, N_("client watcher created"), c_data->c_fd, c_data->s_fd,
         c_data->buf, pfw->buf_size);
 
     ev_io_init(c_w, read_event, c, EV_READ);
     ev_io_start(pfw->ev_loop, c_w);
-    LOG_DEBUG(app->logger, "%s: %s (fd=%d, event=EV_READ, data=%p)",
+    LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
         pfw->name, N_("client watcher started"),
         c_w->fd, c_w->data);
 
@@ -1039,21 +1106,21 @@ accept_event(EV_P_ ev_io *w, gint revents)
     s_data->c_port = c_port;
     s_data->s_fd = s;
     s_data->buf = g_new0(gchar, pfw->buf_size);
-    LOG_DEBUG(app->logger, "%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
+    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
         pfw->name, N_("server watcher created"), s_data->c_fd, s_data->s_fd,
         s_data->buf, pfw->buf_size);
 
     ev_io_init(s_w, read_event, s, EV_READ);
     ev_io_start(pfw->ev_loop, s_w);
-    LOG_DEBUG(app->logger, "%s: %s (fd=%d, event=EV_READ, data=%p)",
+    LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
         pfw->name, N_("server watcher started"), s_w->fd, s_w->data);
 
     if (pfw->af == AF_INET6)
-    LOG_INFO(app->logger, "%s: %s ([%s]:%hu => [%s]:%hu)",
+    LOG_INFO("%s: %s ([%s]:%hu => [%s]:%hu)",
         pfw->name, N_("new client connection"),
         c_ip, c_port, pfw->forward_ip, pfw->forward_port);
     else
-    LOG_INFO(app->logger, "%s: %s (%s:%hu => %s:%hu)",
+    LOG_INFO("%s: %s (%s:%hu => %s:%hu)",
         pfw->name, N_("new client connection"),
         c_ip, c_port, pfw->forward_ip, pfw->forward_port);
   }
@@ -1061,7 +1128,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
 static void
 read_event(EV_P_ ev_io *w, gint revents)
   {
-    LOG_DEBUG(app->logger, "%s (fd=%d, data=%p)",
+    LOG_DEBUG("%s (fd=%d, data=%p)",
         N_("new read event"), w->fd, w->data);
 
     gint n;
@@ -1069,57 +1136,57 @@ read_event(EV_P_ ev_io *w, gint revents)
     pfw_io_t *pfw_io = (pfw_io_t *)w->data;
     if (pfw_io == NULL)
       {
-        LOG_ERROR(app->logger, "%s", N_("no data found, ignoring event"));
+        LOG_ERROR("%s", N_("no data found, ignoring event"));
 
         ev_io_stop(EV_DEFAULT_UC, w);
-        LOG_DEBUG(app->logger, "%s", N_("watcher stopped"));
+        LOG_DEBUG("%s", N_("watcher stopped"));
 
         g_free(w);
 
         return;
       }
 
-    LOG_DEBUG(app->logger, "%s: %s (c_fd=%d, s_fd=%d)",
+    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d)",
         pfw_io->pfw->name, N_("event data"), pfw_io->c_fd, pfw_io->s_fd);
 
     n = read(w->fd, pfw_io->buf, pfw_io->pfw->buf_size);
-    LOG_DEBUG(app->logger, "%s: %s=%d", pfw_io->pfw->name, N_("bytes readed"), n);
-  if (n <= 0)
-    {
-      ev_io_stop(pfw_io->pfw->ev_loop, w);
-      LOG_DEBUG(app->logger, "%s: %s", pfw_io->pfw->name, N_("watcher stopped"));
+    LOG_DEBUG("%s: %s=%d", pfw_io->pfw->name, N_("bytes readed"), n);
+    if (n <= 0)
+      {
+        ev_io_stop(pfw_io->pfw->ev_loop, w);
+        LOG_DEBUG("%s: %s", pfw_io->pfw->name, N_("watcher stopped"));
 
-      close(pfw_io->s_fd);
-      close(pfw_io->c_fd);
+        close(pfw_io->s_fd);
+        close(pfw_io->c_fd);
 
-      if (w->fd == pfw_io->c_fd)
-        {
-          if (pfw_io->pfw->af == AF_INET6)
-            LOG_INFO(app->logger, "%s: %s ([%s]:%hu => [%s]:%hu)",
+        if (w->fd == pfw_io->c_fd)
+          {
+            if (pfw_io->pfw->af == AF_INET6)
+            LOG_INFO("%s: %s ([%s]:%hu => [%s]:%hu)",
                 pfw_io->pfw->name, N_("client connection closed"),
                 pfw_io->c_ip, pfw_io->c_port, pfw_io->pfw->forward_ip,
                 pfw_io->pfw->forward_port);
-          else
-            LOG_INFO(app->logger, "%s: %s (%s:%hu => %s:%hu)",
+            else
+            LOG_INFO("%s: %s (%s:%hu => %s:%hu)",
                 pfw_io->pfw->name, N_("client connection closed"),
                 pfw_io->c_ip, pfw_io->c_port, pfw_io->pfw->forward_ip,
                 pfw_io->pfw->forward_port);
-        }
+          }
 
-      g_free(pfw_io->buf);
-      g_free(pfw_io);
-      g_free(w);
+        g_free(pfw_io->buf);
+        g_free(pfw_io);
+        g_free(w);
 
-      return;
-    }
+        return;
+      }
 
-  if (w->fd == pfw_io->c_fd)
+    if (w->fd == pfw_io->c_fd)
     n = write(pfw_io->s_fd, pfw_io->buf, n);
-  else
+    else
     n = write(pfw_io->c_fd, pfw_io->buf, n);
-  LOG_DEBUG(app->logger, "%s: %s=%d", pfw_io->pfw->name, N_("bytes written"),
-      n);
-}
+    LOG_DEBUG("%s: %s=%d", pfw_io->pfw->name, N_("bytes written"),
+        n);
+  }
 
 gboolean
 pfwd_check_access(pfw_t *pfw, gchar *ip)
@@ -1136,8 +1203,7 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
         {
           if (g_pattern_match_simple(pfw->deny_ips[i], ip))
             {
-              LOG_DEBUG(app->logger, "%s (%s)",
-                  N_("address matches deny rule"), ip);
+              LOG_DEBUG("%s (%s)", N_("address matches deny rule"), ip);
 
               return FALSE;
             }
@@ -1152,8 +1218,7 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
         {
           if (g_pattern_match_simple(pfw->allow_ips[i], ip))
             {
-              LOG_DEBUG(app->logger, "%s (%s)",
-                  N_("address matches allow rule"), ip);
+              LOG_DEBUG("%s (%s)", N_("address matches allow rule"), ip);
 
               return TRUE;
             }
@@ -1162,14 +1227,12 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
 
   if (allow)
     {
-      LOG_DEBUG(app->logger, "%s (%s)",
-          N_("address matches default deny rule"), ip);
+      LOG_DEBUG("%s (%s)", N_("address matches default deny rule"), ip);
 
       return FALSE;
     }
 
-  LOG_DEBUG(app->logger, "%s (%s)",
-      N_("address matches default allow rule"), ip);
+  LOG_DEBUG("%s (%s)", N_("address matches default allow rule"), ip);
 
   return TRUE;
 }
@@ -1242,13 +1305,13 @@ parse_command_line(gint argc, gchar *argv[])
 void
 sigpipe(gint sig)
 {
-  LOG_INFO(app->logger, "%s", N_("SIGPIPE received, continuing execution"));
+  LOG_INFO("%s", N_("SIGPIPE received, continuing execution"));
 }
 
 void
 sighup(gint sig)
 {
-  LOG_INFO(app->logger, "%s", N_("SIGHUP received, reloading configuration"));
+  LOG_INFO("%s", N_("SIGHUP received, reloading configuration"));
 
   reload_config();
 }
@@ -1256,7 +1319,7 @@ sighup(gint sig)
 void
 sigint(gint sig)
 {
-  LOG_INFO(app->logger, "%s", N_("SIGINT received, exiting"));
+  LOG_INFO("%s", N_("SIGINT received, exiting"));
 
   exit(0);
 }
@@ -1264,7 +1327,7 @@ sigint(gint sig)
 void
 sigterm(gint sig)
 {
-  LOG_INFO(app->logger, "%s", N_("SIGTERM received, exiting"));
+  LOG_INFO("%s", N_("SIGTERM received, exiting"));
 
   exit(0);
 }
@@ -1275,7 +1338,7 @@ cleanup(void)
   gboolean daemon;
   GError *error = NULL;
 
-  if (app && app->settings)
+  if (app->settings && app->daemon)
     {
       daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
           CONFIG_KEY_MAIN_DAEMONIZE, &error);
@@ -1283,14 +1346,8 @@ cleanup(void)
         daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
       if (daemon)
         {
-          gchar *lock_file, *pid_file;
-          lock_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-              CONFIG_KEY_MAIN_LOCKFILE, NULL);
-          if (lock_file)
-            {
-              g_unlink(lock_file);
-              g_free(lock_file);
-            }
+          gchar *pid_file;
+
           pid_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
               CONFIG_KEY_MAIN_PIDFILE, NULL);
           if (pid_file)
@@ -1299,44 +1356,40 @@ cleanup(void)
               g_free(pid_file);
             }
         }
+
+      LOG_INFO("%s %s", PACKAGE, N_("daemon stopped"));
     }
 
   if (app->logger)
-    log_message(app->logger, LOG_LEVEL_INFO, "%s %s", PACKAGE, N_("stopped"));
+    log_destroy_logger(app->logger);
 
-  if (app)
+  if (app->pfwds)
     {
-      if (app->logger)
-        log_destroy_logger(app->logger);
+      GSList *item;
+      pfw_t *pfw;
 
-      if (app->pfwds)
+      for (item = app->pfwds; item; item = item->next)
         {
-          GSList *item;
-          pfw_t *pfw;
+          pfw = (pfw_t *) item->data;
+          if (!pfw)
+            continue;
 
-          for (item = app->pfwds; item; item = item->next)
-            {
-              pfw = (pfw_t *) item->data;
-              if (!pfw)
-                continue;
-
-              g_free(pfw->name);
-              g_free(pfw->listen_ip);
-              g_free(pfw->forward_ip);
-              g_strfreev(pfw->allow_ips);
-              g_strfreev(pfw->deny_ips);
-              g_free(pfw);
-            }
-
-          g_slist_free(app->pfwds);
+          g_free(pfw->name);
+          g_free(pfw->listen_ip);
+          g_free(pfw->forward_ip);
+          g_strfreev(pfw->allow_ips);
+          g_strfreev(pfw->deny_ips);
+          g_free(pfw);
         }
 
-      if (app->settings)
-        g_key_file_free(app->settings);
-
-      g_free(app->config_file);
-      g_free(app);
+      g_slist_free(app->pfwds);
     }
+
+  if (app->settings)
+    g_key_file_free(app->settings);
+
+  g_free(app->config_file);
+  g_free(app);
 }
 
 gint
@@ -1347,10 +1400,8 @@ main(gint argc, gchar *argv[])
   GError *error = NULL;
 
   setlocale(LC_ALL, "");
-  bindtextdomain(PACKAGE, PACKAGE_LOCALE_DIR);
+  bindtextdomain(PACKAGE, LOCALEDIR);
   textdomain(PACKAGE);
-
-  g_thread_init(NULL);
 
   app = g_new0(application_t, 1);
   atexit(cleanup);
@@ -1367,7 +1418,7 @@ main(gint argc, gchar *argv[])
   app->logger = init_logger();
   if (!app->logger)
     {
-      g_printerr("%s\n", "Failed to create logger");
+      g_printerr("%s\n", N_("failed to create logger"));
 
       exit(-2);
     }
@@ -1378,15 +1429,7 @@ main(gint argc, gchar *argv[])
     daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
   if (daemon)
     {
-      gchar *lock_file, *pid_file, *user, *group;
-
-      lock_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_LOCKFILE, NULL);
-      if (!lock_file)
-        lock_file = g_strdup(CONFIG_KEY_MAIN_LOCKFILE_DEFAULT);
-
-      pid_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_PIDFILE, NULL);
+      gchar *pid_file, *user, *group;
 
       if (!pid_file)
         pid_file = g_strdup(CONFIG_KEY_MAIN_PIDFILE_DEFAULT);
@@ -1401,20 +1444,21 @@ main(gint argc, gchar *argv[])
       if (!group)
         group = g_strdup(CONFIG_KEY_MAIN_GROUP_DEFAULT);
 
-      ret = daemonize(lock_file, pid_file, user, group);
+      ret = daemonize(pid_file, user, group);
 
-      g_free(lock_file);
       g_free(pid_file);
       g_free(user);
       g_free(group);
 
       if (ret < 0)
         {
-          log_message(app->logger, LOG_LEVEL_ERROR, "%s: %d",
-              N_("Failed to daemonize, error code"), ret);
+          LOG_ERROR("%s: %d", N_("failed to daemonize, error code"), ret);
 
-          exit(-4);
+          exit(-3);
         }
+
+      app->daemon = TRUE;
+      LOG_INFO("%s %s", PACKAGE, N_("daemon started"));
     }
 
   signal(SIGPIPE, sigpipe);
@@ -1422,10 +1466,8 @@ main(gint argc, gchar *argv[])
   signal(SIGINT, sigint);
   signal(SIGTERM, sigterm);
 
-  log_message(app->logger, LOG_LEVEL_INFO, "%s %s", PACKAGE, N_("started"));
-
   if (!run_main_loop())
-    exit(-5);
+    exit(-4);
 
   return 0;
 }

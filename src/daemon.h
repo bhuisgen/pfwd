@@ -1,5 +1,5 @@
 /*
- * pfwd - a port forwarding server
+ * fmond - file monitoring daemon
  *
  * Copyright 2011 Boris HUISGEN <bhuisgen@hbis.fr>
  *
@@ -22,7 +22,6 @@
 #define DAEMON_H_
 
 int
-daemonize(const char *lock_file, const char *pid_file, const char *user,
-    const char *group);
+daemonize(const char *pid_file, const char *user, const char *group);
 
 #endif /* DAEMON_H_ */

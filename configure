@@ -605,12 +605,16 @@ ac_includes_default="\
 ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 LTLIBOBJS
-PACKAGE_SYSCONF_DIR
-PACKAGE_LOCALE_DIR
-PACKAGE_DOC_DIR
-PACKAGE_DATA_DIR
-PACKAGE_PREFIX_DIR
-PWD
+USE_UNDEF_FALSE
+USE_UNDEF_TRUE
+USE_REDHAT_FALSE
+USE_REDHAT_TRUE
+USE_GENTOO_FALSE
+USE_GENTOO_TRUE
+USE_DEBIAN_FALSE
+USE_DEBIAN_TRUE
+USE_DARWIN_FALSE
+USE_DARWIN_TRUE
 LIBOBJS
 DEPS_LIBS
 DEPS_CFLAGS
@@ -723,11 +727,16 @@ PACKAGE_VERSION
 PACKAGE_TARNAME
 PACKAGE_NAME
 PATH_SEPARATOR
-SHELL'
+SHELL
+FWD_VERSION'
 ac_subst_files=''
 ac_user_opts='
 enable_option_checking
 enable_debug
+enable_darwin
+enable_debian
+enable_gentoo
+enable_redhat
 enable_dependency_tracking
 enable_nls
 with_gnu_ld
@@ -1370,6 +1379,10 @@ Optional Features:
   --disable-FEATURE       do not include FEATURE (same as --enable-FEATURE=no)
   --enable-FEATURE[=ARG]  include FEATURE [ARG=yes]
   --enable-debug          generate debug informations
+  --enable-darwin         use Darwin configuration
+  --enable-debian         use Debian configuration
+  --enable-gentoo         use Gentoo configuration
+  --enable-redhat         use Red Hat configuration
   --disable-dependency-tracking  speeds up one-time build
   --enable-dependency-tracking   do not reject slow dependency extractors
   --disable-nls           do not use Native Language Support
@@ -2758,6 +2771,42 @@ else
   debug=no
 fi
 
+# Check whether --enable-darwin was given.
+if test "${enable_darwin+set}" = set; then :
+  enableval=$enable_darwin; if test "$enableval" = "yes"; then
+   	initd_type=darwin
+   fi
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Darwin support" >&5
+$as_echo "enabling Darwin support" >&6; }
+fi
+
+# Check whether --enable-debian was given.
+if test "${enable_debian+set}" = set; then :
+  enableval=$enable_debian; if test "$enableval" = "yes"; then
+   	initd_type=debian
+   fi
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Debian support" >&5
+$as_echo "enabling Debian support" >&6; }
+fi
+
+# Check whether --enable-gentoo was given.
+if test "${enable_gentoo+set}" = set; then :
+  enableval=$enable_gentoo; if test "$enableval" = "yes"; then
+   	initd_type=gentoo
+   fi
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Gentoo support" >&5
+$as_echo "enabling Gentoo support" >&6; }
+fi
+
+# Check whether --enable-redhat was given.
+if test "${enable_redhat+set}" = set; then :
+  enableval=$enable_redhat; if test "$enableval" = "yes"; then
+   	initd_type=redhat
+   fi
+   { $as_echo "$as_me:${as_lineno-$LINENO}: result: enabling Red Hat support" >&5
+$as_echo "enabling Red Hat support" >&6; }
+fi
+
 
 # Checks for platforms
 # Make sure we can run config.sub.
@@ -2834,6 +2883,74 @@ case $host_os in *\ *) host_os=`echo "$host_os" | sed 's/ /-/g'`;; esac
 case "${host_os}" in
    *darwin*)
 	LDFLAGS="$LDFLAGS -framework CoreServices"
+   host_os=unix
+
+
+$as_echo "#define OS_UNIX /**/" >>confdefs.h
+
+
+$as_echo "#define OS_BSD /**/" >>confdefs.h
+
+
+$as_echo "#define OS_DARWIN /**/" >>confdefs.h
+
+   ;;
+
+   *freebsd*)
+   host_os=unix
+
+
+$as_echo "#define OS_UNIX /**/" >>confdefs.h
+
+
+$as_echo "#define OS_BSD /**/" >>confdefs.h
+
+
+$as_echo "#define OS_FREEBSD /**/" >>confdefs.h
+
+   ;;
+
+   *linux*)
+   host_os=unix
+
+
+$as_echo "#define OS_UNIX /**/" >>confdefs.h
+
+
+$as_echo "#define OS_LINUX /**/" >>confdefs.h
+
+   ;;
+
+   *netbsd*)
+   host_os=unix
+
+
+$as_echo "#define OS_UNIX /**/" >>confdefs.h
+
+
+$as_echo "#define OS_BSD /**/" >>confdefs.h
+
+
+$as_echo "#define OS_NETBSD /**/" >>confdefs.h
+
+   ;;
+
+   *openbsd*)
+   host_os=unix
+
+
+$as_echo "#define OS_UNIX /**/" >>confdefs.h
+
+
+$as_echo "#define OS_BSD /**/" >>confdefs.h
+
+
+$as_echo "#define OS_OPENBSD /**/" >>confdefs.h
+
+   ;;
+
+   *)
+   as_fn_error $? "sorry, host OS not supported." "$LINENO" 5
    ;;
 esac
 
@@ -6828,7 +6945,7 @@ $as_echo "#define HAVE_DCGETTEXT 1" >>confdefs.h
 ALL_LINGUAS="en fr"
 
 # Checks for libraries.
-deps_modules="glib-2.0 >= 2.6.0 gthread-2.0 >= 2.6.0"
+deps_modules="glib-2.0 >= 2.6.0"
 
 
 
@@ -7637,56 +7754,50 @@ $as_echo "#define NDEBUG /**/" >>confdefs.h
       ;;
 esac
 
-# Package directories
-if test "x${prefix}" = "xNONE"; then
-  PACKAGE_PREFIX_DIR="${ac_default_prefix}"
-  PACKAGE_DATA_DIR="${ac_default_prefix}/share/${PACKAGE}"
-  PACKAGE_DOC_DIR="${ac_default_prefix}/share/doc/${PACKAGE}"
-  PACKAGE_LOCALE_DIR="${ac_default_prefix}/share/locale"
-  PACKAGE_SYSCONF_DIR="${ac_default_prefix}/etc"
+# OS flags
+ if test x$initd_type = xdarwin; then
+  USE_DARWIN_TRUE=
+  USE_DARWIN_FALSE='#'
 else
-  PACKAGE_PREFIX_DIR="${prefix}"
-  PACKAGE_DATA_DIR="${prefix}/share/${PACKAGE}"
-  PACKAGE_DOC_DIR="${prefix}/share/doc/${PACKAGE}"
-  PACKAGE_LOCALE_DIR="${prefix}/share/locale"
-  PACKAGE_SYSCONF_DIR="${prefix}/etc"
+  USE_DARWIN_TRUE='#'
+  USE_DARWIN_FALSE=
 fi
 
-PWD="$PWD"
+ if test x$initd_type = xdebian; then
+  USE_DEBIAN_TRUE=
+  USE_DEBIAN_FALSE='#'
+else
+  USE_DEBIAN_TRUE='#'
+  USE_DEBIAN_FALSE=
+fi
 
+ if test x$initd_type = xgentoo; then
+  USE_GENTOO_TRUE=
+  USE_GENTOO_FALSE='#'
+else
+  USE_GENTOO_TRUE='#'
+  USE_GENTOO_FALSE=
+fi
 
+ if test x$initd_type = xredhat; then
+  USE_REDHAT_TRUE=
+  USE_REDHAT_FALSE='#'
+else
+  USE_REDHAT_TRUE='#'
+  USE_REDHAT_FALSE=
+fi
 
-
-
-
-
-cat >>confdefs.h <<_ACEOF
-#define PACKAGE_PREFIX_DIR "${PACKAGE_PREFIX_DIR}"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define PACKAGE_DATA_DIR "${PACKAGE_DATA_DIR}"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define PACKAGE_DOC_DIR "${PACKAGE_DOC_DIR}"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define PACKAGE_LOCALE_DIR "${PACKAGE_LOCALE_DIR}"
-_ACEOF
-
-
-cat >>confdefs.h <<_ACEOF
-#define PACKAGE_SYSCONF_DIR "${PACKAGE_SYSCONF_DIR}"
-_ACEOF
+ if test x$initd_type = x; then
+  USE_UNDEF_TRUE=
+  USE_UNDEF_FALSE='#'
+else
+  USE_UNDEF_TRUE='#'
+  USE_UNDEF_FALSE=
+fi
 
 
 # Generate Makefiles
-ac_config_files="$ac_config_files Makefile src/Makefile po/Makefile.in doc/Makefile"
+ac_config_files="$ac_config_files Makefile src/Makefile po/Makefile.in data/Makefile data/boot/Makefile data/boot/darwin/Makefile data/boot/debian/Makefile data/boot/gentoo/Makefile data/boot/redhat/Makefile doc/Makefile"
 
 
 cat >confcache <<\_ACEOF
@@ -7816,6 +7927,26 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${am__fastdepCC_TRUE}" && test -z "${am__fastdepCC_FALSE}"; then
   as_fn_error $? "conditional \"am__fastdepCC\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_DARWIN_TRUE}" && test -z "${USE_DARWIN_FALSE}"; then
+  as_fn_error $? "conditional \"USE_DARWIN\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_DEBIAN_TRUE}" && test -z "${USE_DEBIAN_FALSE}"; then
+  as_fn_error $? "conditional \"USE_DEBIAN\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_GENTOO_TRUE}" && test -z "${USE_GENTOO_FALSE}"; then
+  as_fn_error $? "conditional \"USE_GENTOO\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_REDHAT_TRUE}" && test -z "${USE_REDHAT_FALSE}"; then
+  as_fn_error $? "conditional \"USE_REDHAT\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${USE_UNDEF_TRUE}" && test -z "${USE_UNDEF_FALSE}"; then
+  as_fn_error $? "conditional \"USE_UNDEF\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 
@@ -8436,6 +8567,12 @@ do
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
     "po/Makefile.in") CONFIG_FILES="$CONFIG_FILES po/Makefile.in" ;;
+    "data/Makefile") CONFIG_FILES="$CONFIG_FILES data/Makefile" ;;
+    "data/boot/Makefile") CONFIG_FILES="$CONFIG_FILES data/boot/Makefile" ;;
+    "data/boot/darwin/Makefile") CONFIG_FILES="$CONFIG_FILES data/boot/darwin/Makefile" ;;
+    "data/boot/debian/Makefile") CONFIG_FILES="$CONFIG_FILES data/boot/debian/Makefile" ;;
+    "data/boot/gentoo/Makefile") CONFIG_FILES="$CONFIG_FILES data/boot/gentoo/Makefile" ;;
+    "data/boot/redhat/Makefile") CONFIG_FILES="$CONFIG_FILES data/boot/redhat/Makefile" ;;
     "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5;;

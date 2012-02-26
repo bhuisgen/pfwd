@@ -1,8 +1,11 @@
 #                                               -*- Autoconf -*-
 # Process this file with autoconf to produce a configure script.
 
+PFWD_VERSION=`cat $srcdir/VERSION`
+AC_SUBST(FWD_VERSION)
+
 AC_PREREQ([2.67])
-AC_INIT([pfwd], [0.1], [bhuisgen@hbis.fr], [pfwd], [http://blog.hbis.fr])
+AC_INIT([pfwd], m4_esyscmd([tr -d '\n' <VERSION]), [bhuisgen@hbis.fr], [pfwd], [http://blog.hbis.fr])
 AC_CONFIG_HEADER([config.h])
 AM_INIT_AUTOMAKE()
 
@@ -11,12 +14,71 @@ AC_ARG_ENABLE(debug,
    AC_HELP_STRING([--enable-debug], [generate debug informations]),
    debug=yes,
    debug=no)
+AC_ARG_ENABLE(darwin,
+   AC_HELP_STRING([--enable-darwin], [use Darwin configuration]),
+   if test "$enableval" = "yes"; then
+   	initd_type=darwin
+   fi
+   AC_MSG_RESULT([enabling Darwin support]))
+AC_ARG_ENABLE(debian,
+   AC_HELP_STRING([--enable-debian], [use Debian configuration]),
+   if test "$enableval" = "yes"; then
+   	initd_type=debian
+   fi
+   AC_MSG_RESULT([enabling Debian support]))
+AC_ARG_ENABLE(gentoo,
+   AC_HELP_STRING([--enable-gentoo], [use Gentoo configuration]),
+   if test "$enableval" = "yes"; then
+   	initd_type=gentoo
+   fi
+   AC_MSG_RESULT([enabling Gentoo support]))
+AC_ARG_ENABLE(redhat,
+   AC_HELP_STRING([--enable-redhat], [use Red Hat configuration]),
+   if test "$enableval" = "yes"; then
+   	initd_type=redhat
+   fi
+   AC_MSG_RESULT([enabling Red Hat support]))
 
 # Checks for platforms
 AC_CANONICAL_HOST
 case "${host_os}" in
    *darwin*)
 	LDFLAGS="$LDFLAGS -framework CoreServices"
+   AC_SUBST(host_os, [unix])
+   AC_DEFINE(OS_UNIX, [], [UNIX])
+   AC_DEFINE(OS_BSD, [], [BSD])
+   AC_DEFINE(OS_DARWIN, [], [Darwin])
+   ;;
+
+   *freebsd*)
+   AC_SUBST(host_os, [unix])
+   AC_DEFINE(OS_UNIX, [], [UNIX])
+   AC_DEFINE(OS_BSD, [], [BSD])
+   AC_DEFINE(OS_FREEBSD, [], [FreeBSD])
+   ;;
+
+   *linux*)
+   AC_SUBST(host_os, [unix])
+   AC_DEFINE(OS_UNIX, [], [UNIX])
+   AC_DEFINE(OS_LINUX, [], [Linux])
+   ;;
+
+   *netbsd*)
+   AC_SUBST(host_os, [unix])
+   AC_DEFINE(OS_UNIX, [], [UNIX])
+   AC_DEFINE(OS_BSD, [], [BSD])
+   AC_DEFINE(OS_NETBSD, [], [NetBSD])
+   ;;
+
+   *openbsd*)
+   AC_SUBST(host_os, [unix])
+   AC_DEFINE(OS_UNIX, [], [UNIX])
+   AC_DEFINE(OS_BSD, [], [BSD])
+   AC_DEFINE(OS_OPENBSD, [], [OpenBSD])
+   ;;
+
+   *)
+   AC_MSG_ERROR([sorry, host OS not supported.])
    ;;
 esac
 
@@ -34,7 +96,7 @@ AM_GNU_GETTEXT_VERSION([0.18.1])
 ALL_LINGUAS="en fr"
 
 # Checks for libraries.
-deps_modules="glib-2.0 >= 2.6.0 gthread-2.0 >= 2.6.0"
+deps_modules="glib-2.0 >= 2.6.0"
 PKG_CHECK_MODULES(DEPS, [$deps_modules])
 AC_SUBST(DEPS_CFLAGS)
 AC_SUBST(DEPS_LIBS)
@@ -51,7 +113,7 @@ AC_CHECK_HEADERS([arpa/inet.h netinet/in.h])
 AC_C_INLINE
 
 # Checks for library functions.
-AC_CHECK_FUNCS([atexit memset setlocale socket strcasecmp strdup strtol])
+AC_CHECK_FUNCS([atexit memset setlocale socket strcasecmp strdup])
 AC_FUNC_FORK
 AC_FUNC_MALLOC
 AC_TYPE_PID_T
@@ -69,38 +131,24 @@ case "${debug}" in
       ;;
 esac
 
-# Package directories
-if test "x${prefix}" = "xNONE"; then
-  PACKAGE_PREFIX_DIR="${ac_default_prefix}"
-  PACKAGE_DATA_DIR="${ac_default_prefix}/share/${PACKAGE}"
-  PACKAGE_DOC_DIR="${ac_default_prefix}/share/doc/${PACKAGE}"
-  PACKAGE_LOCALE_DIR="${ac_default_prefix}/share/locale"
-  PACKAGE_SYSCONF_DIR="${ac_default_prefix}/etc"
-else
-  PACKAGE_PREFIX_DIR="${prefix}"
-  PACKAGE_DATA_DIR="${prefix}/share/${PACKAGE}"
-  PACKAGE_DOC_DIR="${prefix}/share/doc/${PACKAGE}"
-  PACKAGE_LOCALE_DIR="${prefix}/share/locale"
-  PACKAGE_SYSCONF_DIR="${prefix}/etc"
-fi
-
-AC_SUBST(PWD, "$PWD")
-AC_SUBST(PACKAGE_PREFIX_DIR)
-AC_SUBST(PACKAGE_DATA_DIR)
-AC_SUBST(PACKAGE_DOC_DIR)
-AC_SUBST(PACKAGE_LOCALE_DIR)
-AC_SUBST(PACKAGE_SYSCONF_DIR)
-AC_DEFINE_UNQUOTED(PACKAGE_PREFIX_DIR, "${PACKAGE_PREFIX_DIR}", [package prefix])
-AC_DEFINE_UNQUOTED(PACKAGE_DATA_DIR, "${PACKAGE_DATA_DIR}", [data directory])
-AC_DEFINE_UNQUOTED(PACKAGE_DOC_DIR, "${PACKAGE_DOC_DIR}", [doc directory])
-AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, "${PACKAGE_LOCALE_DIR}", [locale directory])
-AC_DEFINE_UNQUOTED(PACKAGE_SYSCONF_DIR, "${PACKAGE_SYSCONF_DIR}", [sysconf directory])
+# OS flags
+AM_CONDITIONAL(USE_DARWIN, test x$initd_type = xdarwin)
+AM_CONDITIONAL(USE_DEBIAN, test x$initd_type = xdebian)
+AM_CONDITIONAL(USE_GENTOO, test x$initd_type = xgentoo)
+AM_CONDITIONAL(USE_REDHAT, test x$initd_type = xredhat)
+AM_CONDITIONAL(USE_UNDEF, test x$initd_type = x)
 
 # Generate Makefiles
 AC_CONFIG_FILES([
 	Makefile
 	src/Makefile
-    po/Makefile.in
+	po/Makefile.in
+	data/Makefile
+	data/boot/Makefile
+	data/boot/darwin/Makefile
+	data/boot/debian/Makefile
+	data/boot/gentoo/Makefile
+	data/boot/redhat/Makefile
 	doc/Makefile
 ])
 

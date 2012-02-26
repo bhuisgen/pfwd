@@ -1,5 +1,5 @@
 /*
- * pfwd - a port forwarding server
+ * fmond - file monitoring daemon
  *
  * Copyright 2011 Boris HUISGEN <bhuisgen@hbis.fr>
  *
@@ -25,39 +25,47 @@
 #include <fcntl.h>
 #include <grp.h>
 #include <pwd.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 
 int
-daemonize(const char *lock_file, const char *pid_file, const char *user,
-    const char *group)
+daemonize(const char *pid_file, const char *user, const char *group)
 {
-  if (getppid() == 1)
-    return 0;
-
-  pid_t pid, sid;
+  pid_t pid, ppid, sid;
   int fd;
   int ret;
   char str_pid[12];
 
-  if (lock_file)
+  if (getppid() == 1)
+    return 0;
+
+  if (user && group && ((getuid() == 0) || (geteuid() == 0)))
     {
-      fd = open(lock_file, O_RDWR | O_CREAT, 0644);
-      if (fd < 0)
+      struct passwd *pwd;
+      struct group *grp;
+
+      pwd = getpwnam(user);
+      if (!pwd)
         return (-1);
 
-      ret = lockf(fd, F_TEST, 0);
-      close(fd);
-      if (ret != 0)
+      grp = getgrnam(group);
+      if (!grp)
         return (-2);
+
+      if ((setregid(grp->gr_gid, grp->gr_gid) != 0) || (setreuid(pwd->pw_uid,
+          pwd->pw_uid) != 0))
+        return (-3);
     }
 
   pid = fork();
   if (pid < 0)
-    return (-3);
+    return (-4);
   if (pid > 0)
     exit(EXIT_SUCCESS);
+
+  ppid = getppid();
 
   signal(SIGCHLD, SIG_DFL);
   signal(SIGTSTP, SIG_IGN);
@@ -70,10 +78,10 @@ daemonize(const char *lock_file, const char *pid_file, const char *user,
 
   sid = setsid();
   if (sid < 0)
-    return (-4);
+    return (-5);
 
   if (chdir("/tmp") < 0)
-    return (-5);
+    return (-6);
 
   if (!freopen("/dev/null", "r", stdin))
     perror("freopen");
@@ -84,46 +92,17 @@ daemonize(const char *lock_file, const char *pid_file, const char *user,
   if (!freopen("/dev/null", "w", stderr))
     perror("freopen");
 
-  if (user && group && ((getuid() == 0) || (geteuid() == 0)))
-    {
-      struct passwd *pwd;
-      struct group *grp;
-
-      pwd = getpwnam(user);
-      if (!pwd)
-        return (-6);
-
-      grp = getgrnam(group);
-      if (!grp)
-        return (-7);
-
-      if ((setregid(grp->gr_gid, grp->gr_gid) != 0) || (setreuid(pwd->pw_uid,
-          pwd->pw_uid) != 0))
-        return (-8);
-    }
-
-  if (lock_file)
-    {
-      fd = open(lock_file, O_RDWR | O_CREAT, 0644);
-      if (fd < 0)
-        return (-9);
-
-      ret = lockf(fd, F_TLOCK, 0);
-      if (ret != 0)
-        return (-10);
-    }
-
   if (pid_file)
     {
-      fd = open(pid_file, O_RDWR | O_CREAT, 0644);
+      fd = open(pid_file, O_RDWR | O_CREAT | O_EXCL, 0640);
       if (fd < 0)
-        return (-11);
+        return (-7);
 
-      snprintf(str_pid, 12, "%d\n", pid);
+      snprintf(str_pid, 12, "%d\n", getpid());
       ret = write(fd, str_pid, strlen(str_pid));
       close(fd);
       if (ret < 0)
-        return (-12);
+        return (-8);
     }
 
   return (0);

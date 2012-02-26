@@ -1,0 +1,4 @@
+# Configuration file for the pfwd service.
+
+# set to 1 to start fmond on system startup
+STARTUP=0

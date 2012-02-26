@@ -1,12 +1,24 @@
-SUBDIRS = src po doc
+SUBDIRS = src po data doc
 
-pfwd_docdir = @PACKAGE_DOC_DIR@
+pfwd_docdir = $(docdir)
 
-pfwd_doc_DATA = AUTHORS COPYING ChangeLog INSTALL NEWS README
+pfwd_doc_DATA = \
+	AUTHORS \
+	COPYING \
+	ChangeLog \
+	INSTALL \
+	NEWS \
+	README \
+	TODO \
+	VERSION
 
 ACLOCAL_AMFLAGS = -I m4
 
-EXTRA_DIST = config.rpath m4/ChangeLog
+EXTRA_DIST = \
+	$(fmond_doc_DATA) \
+	config.rpath \
+	m4/ChangeLog \
+	autogen.sh
 
 dist-hook:
 

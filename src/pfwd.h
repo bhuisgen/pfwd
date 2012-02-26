@@ -27,36 +27,35 @@
 #define PFWD_COPYRIGHT    			"Copyright (C) 2011 Boris HUISGEN <bhuisgen@hbis.fr>"
 #define PFWD_LICENCE				"This is free software; see the source for copying conditions.  There is NO\n" \
 						"warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
-#define PFWD_CONFIGFILE        	        	"pfwd.conf"
+#define PFWD_HOMEDIR				"." PACKAGE
+#define PFWD_CONFIGFILE				PACKAGE ".conf"
 
 #define CONFIG_GROUP_MAIN                       "main"
 #define CONFIG_KEY_MAIN_DAEMONIZE               "Daemonize"
 #define CONFIG_KEY_MAIN_DAEMONIZE_NO            0
 #define CONFIG_KEY_MAIN_DAEMONIZE_YES           1
 #define CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT       CONFIG_KEY_MAIN_DAEMONIZE_NO
-#define CONFIG_KEY_MAIN_LOCKFILE                "LockFile"
-#define CONFIG_KEY_MAIN_LOCKFILE_DEFAULT        "/var/run/pfwd.lock"
 #define CONFIG_KEY_MAIN_PIDFILE                 "PIDFile"
-#define CONFIG_KEY_MAIN_PIDFILE_DEFAULT         "/var/run/pfwd.pid"
+#define CONFIG_KEY_MAIN_PIDFILE_DEFAULT         "/var/run/" PACKAGE "/" PACKAGE ".pid"
 #define CONFIG_KEY_MAIN_USER                    "User"
-#define CONFIG_KEY_MAIN_USER_DEFAULT            "nobody"
+#define CONFIG_KEY_MAIN_USER_DEFAULT            "root"
 #define CONFIG_KEY_MAIN_GROUP                   "Group"
-#define CONFIG_KEY_MAIN_GROUP_DEFAULT           "nogroup"
-#define CONFIG_KEY_MAIN_USESYSLOG               "UseSyslog"
-#define CONFIG_KEY_MAIN_USESYSLOG_NO            0
-#define CONFIG_KEY_MAIN_USESYSLOG_YES           1
-#define CONFIG_KEY_MAIN_USESYSLOG_DEFAULT       CONFIG_KEY_MAIN_USESYSLOG_NO
+#define CONFIG_KEY_MAIN_GROUP_DEFAULT           "root"
+#define CONFIG_KEY_MAIN_LOGLEVEL                "LogLevel"
+#define CONFIG_KEY_MAIN_LOGLEVEL_NONE            0
+#define CONFIG_KEY_MAIN_LOGLEVEL_ERROR           1
+#define CONFIG_KEY_MAIN_LOGLEVEL_WARNING         2
+#define CONFIG_KEY_MAIN_LOGLEVEL_INFO            3
+#define CONFIG_KEY_MAIN_LOGLEVEL_DEBUG           4
+#define CONFIG_KEY_MAIN_LOGLEVEL_DEFAULT         CONFIG_KEY_MAIN_LOGLEVEL_INFO
+#define CONFIG_KEY_MAIN_LOGFILE                  "LogFile"
+#define CONFIG_KEY_MAIN_LOGFILE_DEFAULT          "/var/log/" PACKAGE "/" PACKAGE ".log"
+#define CONFIG_KEY_MAIN_USESYSLOG                "UseSyslog"
+#define CONFIG_KEY_MAIN_USESYSLOG_NO             0
+#define CONFIG_KEY_MAIN_USESYSLOG_YES            1
+#define CONFIG_KEY_MAIN_USESYSLOG_DEFAULT        CONFIG_KEY_MAIN_USESYSLOG_NO
 #define CONFIG_KEY_MAIN_SYSLOGFACILITY          "SyslogFacility"
 #define CONFIG_KEY_MAIN_SYSLOGFACILITY_DEFAULT  "DAEMON";
-#define CONFIG_KEY_MAIN_LOGFILE                 "LogFile"
-#define CONFIG_KEY_MAIN_LOGFILE_DEFAULT         "/var/log/pfwd.log"
-#define CONFIG_KEY_MAIN_LOGLEVEL                "LogLevel"
-#define CONFIG_KEY_MAIN_LOGLEVEL_NONE           0
-#define CONFIG_KEY_MAIN_LOGLEVEL_ERROR          1
-#define CONFIG_KEY_MAIN_LOGLEVEL_WARNING        2
-#define CONFIG_KEY_MAIN_LOGLEVEL_INFO           3
-#define CONFIG_KEY_MAIN_LOGLEVEL_DEBUG          4
-#define CONFIG_KEY_MAIN_LOGLEVEL_DEFAULT        CONFIG_KEY_MAIN_LOGLEVEL_INFO
 #define CONFIG_KEY_PFW_LISTEN                   "Listen"
 #define CONFIG_KEY_PFW_LISTENPORT               "ListenPort"
 #define CONFIG_KEY_PFW_BACKLOG                  "Backlog"
@@ -70,9 +69,10 @@
 
 typedef struct _application_t
 {
+  gboolean daemon;
+  logger_t *logger;
   GKeyFile *settings;
   GSList *pfwds;
-  logger_t *logger;
   gchar *config_file;
   gboolean verbose;
 } application_t;

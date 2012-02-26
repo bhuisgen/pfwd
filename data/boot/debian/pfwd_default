@@ -1,0 +1,5 @@
+# Defaults for pfwd initscript (/etc/init.d/pfwd)
+# This is a POSIX shell fragment
+
+# set to 1 to start pfwd on system startup
+STARTUP=0

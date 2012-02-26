@@ -1,0 +1,55 @@
+#!/bin/sh
+#
+# pfwd wrapper script for MacPorts
+#
+
+PATH=/opt/local/sbin
+
+DAEMON=pfwd
+PIDFILE=/opt/local/var/run/pfwd/pfwd.pid
+
+#
+# Start
+#
+Start()
+{
+	$DAEMON
+}
+
+#
+# Stop
+#
+Stop()
+{
+	kill `cat $PIDFILE`
+}
+
+#
+# Restart
+#
+Restart()
+{
+	Stop
+	Start
+}
+
+Reload()
+{
+	kill -HUP `cat $PIDFILE`
+}
+
+#
+# Run
+#
+Run()
+{
+case $1 in
+  start  ) Start   ;;
+  stop   ) Stop    ;;
+  restart) Restart ;;
+  reload ) Reload ;;
+  *      ) echo "$0: unknown argument: $1";;
+esac
+}
+
+Run $1

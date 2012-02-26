@@ -35,6 +35,5 @@
 #include <glib-object.h>
 #include <glib/gprintf.h>
 #include <glib/gstdio.h>
-#include <gio/gio.h>
 
 #endif /* COMMON_H_ */
