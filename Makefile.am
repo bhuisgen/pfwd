@@ -15,7 +15,7 @@ pfwd_doc_DATA = \
 ACLOCAL_AMFLAGS = -I m4
 
 EXTRA_DIST = \
-	$(fmond_doc_DATA) \
+	$(pfwd_doc_DATA) \
 	config.rpath \
 	m4/ChangeLog \
 	autogen.sh

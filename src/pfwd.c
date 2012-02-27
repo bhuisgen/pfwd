@@ -27,6 +27,10 @@
 
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <errno.h>
 #include <ev.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -42,26 +46,29 @@
 #define LOG_DEBUG(_fmt, ...)
 #endif
 
-#define IPV4_ANY                        "*"
-#define IPV4_MAXLEN                     15
-#define IPV6_ANY                        "::"
-#define IPV6_MAXLEN                     45
+#define IPV4_ANY                "*"
+#define IPV4_MAXLEN             15
+#define IPV6_ANY                "::"
+#define IPV6_MAXLEN             45
 
 typedef struct _pfw_t
 {
   gchar *name;
-  gchar *listen_ip;
+  gchar *listen;
   gushort listen_port;
-  gchar *forward_ip;
+  gint listen_af;
+  gint listen_backlog;
+  gchar *forward;
   gushort forward_port;
+  gint forward_af;
+  gint buffer_size;
   gchar **allow_ips;
   gchar **deny_ips;
   struct ev_loop *ev_loop;
   ev_io *w;
   gint fd;
-  gint af;
-  gint backlog;
-  gint buf_size;
+  GSList *c_ws;
+  GSList *s_ws;
 } pfw_t;
 
 typedef struct _pfw_io_t
@@ -88,14 +95,16 @@ logger_t *
 init_logger();
 gboolean
 run_main_loop();
-gboolean
-run_child_loop(pfw_t *pfw);
 static void
 exit_main_loop(void);
+static gboolean
+start_pfwd(pfw_t *pfw);
 static void
-accept_event(EV_P_ ev_io *w, gint revents);
+stop_pfwd(pfw_t *pfw);
 static void
-read_event(EV_P_ ev_io *w, gint revents);
+pfwd_accept_event(EV_P_ ev_io *w, gint revents);
+static void
+pfwd_read_event(EV_P_ ev_io *w, gint revents);
 gboolean
 pfwd_check_access(pfw_t *pfw, gchar *ip);
 void
@@ -130,8 +139,8 @@ get_default_config_file()
     {
       g_free(config_file);
 
-      config_file = g_build_path(G_DIR_SEPARATOR_S, SYSCONFDIR,
-          PFWD_CONFIGFILE, NULL);
+      config_file = g_build_path(G_DIR_SEPARATOR_S, SYSCONFDIR, PFWD_CONFIGFILE,
+          NULL);
     }
 
   return config_file;
@@ -191,8 +200,7 @@ reload_config()
   if (!g_key_file_load_from_file(settings, app->config_file, G_KEY_FILE_NONE,
       &error))
     {
-      LOG_ERROR(
-          "%s: %s (%s)\n",
+      LOG_ERROR( "%s: %s (%s)\n",
           app->config_file, N_("error in config file, aborting reload"), error->message);
 
       g_key_file_free(settings);
@@ -215,8 +223,7 @@ reload_config()
 
   if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
     {
-      LOG_ERROR(
-          "%s: %s (%s)\n",
+      LOG_ERROR( "%s: %s (%s)\n",
           app->config_file, N_("error in config file"), N_("the first group is not 'main'"));
 
       g_free(group);
@@ -239,7 +246,7 @@ GSList *
 init_pfwds()
 {
   GSList *list = NULL;
-  GRegex *regex_ipv6, *regex_ipv4;
+  GRegex *regex_ipv6, *regex_ipv4, *regex_unix;
   GMatchInfo *match_info;
   gchar **groups;
   gsize len;
@@ -247,15 +254,19 @@ init_pfwds()
 
   regex_ipv6 = g_regex_new("^\\[(.+)\\]$", 0, 0, NULL);
   regex_ipv4 = g_regex_new("^(\\d+\\.\\d+\\.\\d+\\.\\d+|\\*)$", 0, 0, NULL);
+  regex_unix = g_regex_new("^unix:(.+)$", 0, 0, NULL);
 
   groups = g_key_file_get_groups(app->settings, &len);
 
   if (len < 2)
     {
       g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
-          N_("no redirection group"));
+          N_("no redirector group"));
 
       g_strfreev(groups);
+      g_regex_unref(regex_unix);
+      g_regex_unref(regex_ipv4);
+      g_regex_unref(regex_ipv6);
 
       return NULL;
     }
@@ -278,9 +289,10 @@ init_pfwds()
         {
           g_printerr("%s: %s\n", pfw->name, N_("invalid listen address"));
 
+          g_free(pfw);
+          g_regex_unref(regex_unix);
           g_regex_unref(regex_ipv4);
           g_regex_unref(regex_ipv6);
-          g_free(pfw);
           g_strfreev(groups);
 
           return NULL;
@@ -297,12 +309,13 @@ init_pfwds()
               g_printerr("%s: %s\n", pfw->name,
                   N_("invalid IPv6 listen address"));
 
-              g_match_info_free(match_info);
               g_free(value);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
+              g_match_info_free(match_info);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
@@ -314,30 +327,29 @@ init_pfwds()
                   N_("invalid IPv6 listen address"));
 
               g_free(ipv6);
-              g_match_info_free(match_info);
               g_free(value);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
+              g_match_info_free(match_info);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
 
-          pfw->af = AF_INET6;
-          pfw->listen_ip = ipv6;
+          pfw->listen = ipv6;
+          pfw->listen_af = AF_INET6;
         }
-      else
+
+      g_match_info_free(match_info);
+
+      if (g_regex_match(regex_ipv4, value, 0, &match_info))
         {
           struct in_addr in4;
           gchar *ipv4;
 
-          g_match_info_free(match_info);
-
-          if (g_regex_match(regex_ipv4, value, 0, &match_info))
-            ipv4 = g_match_info_fetch(match_info, 0);
-          else
-            ipv4 = NULL;
+          ipv4 = g_match_info_fetch(match_info, 0);
           if (!ipv4)
             {
               g_printerr("%s: %s\n", pfw->name,
@@ -345,10 +357,11 @@ init_pfwds()
 
               g_match_info_free(match_info);
               g_free(value);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
@@ -364,44 +377,72 @@ init_pfwds()
                   g_free(ipv4);
                   g_match_info_free(match_info);
                   g_free(value);
-                  g_regex_unref(regex_ipv4);
-                  g_regex_unref(regex_ipv6);
                   g_free(pfw);
                   g_strfreev(groups);
+                  g_regex_unref(regex_unix);
+                  g_regex_unref(regex_ipv4);
+                  g_regex_unref(regex_ipv6);
 
                   return NULL;
                 }
             }
 
-          pfw->af = AF_INET;
-          pfw->listen_ip = ipv4;
+          pfw->listen = ipv4;
+          pfw->listen_af = AF_INET;
+        }
+
+      g_match_info_free(match_info);
+
+      if (g_regex_match(regex_unix, value, 0, &match_info))
+        {
+          gchar *path;
+
+          path = g_match_info_fetch(match_info, 1);
+          if (!path)
+            {
+              g_printerr("%s: %s\n", pfw->name, N_("invalid UNIX listen path"));
+
+              g_match_info_free(match_info);
+              g_free(value);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
+
+              return NULL;
+            }
+
+          pfw->listen = path;
+          pfw->listen_af = AF_UNIX;
         }
 
       g_match_info_free(match_info);
       g_free(value);
 
-      pfw->listen_port = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_LISTENPORT, NULL);
-      if (pfw->listen_port == 0)
+      if (pfw->listen_af != AF_UNIX)
         {
-          g_printerr("%s: %s\n", pfw->name, N_("invalid listen port"));
+          pfw->listen_port = g_key_file_get_integer(app->settings, pfw->name,
+              CONFIG_KEY_PFW_LISTENPORT, NULL);
+          if (pfw->listen_port == 0)
+            {
+              g_printerr("%s: %s\n", pfw->name, N_("invalid listen port"));
 
-          g_free(pfw->listen_ip);
-          g_free(pfw);
-          g_strfreev(groups);
+              g_free(pfw->listen);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
-          return NULL;
+              return NULL;
+            }
         }
 
-      pfw->backlog = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_BACKLOG, NULL);
-      if (pfw->backlog <= 0)
-        pfw->backlog = CONFIG_KEY_PFW_BACKLOG_DEFAULT;
-
-      pfw->buf_size = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_BUFFER, NULL);
-      if (pfw->buf_size < 4096)
-        pfw->buf_size = CONFIG_KEY_PFW_BUFFER_DEFAULT;
+      pfw->listen_backlog = g_key_file_get_integer(app->settings, pfw->name,
+          CONFIG_KEY_PFW_LISTENBACKLOG, NULL);
+      if (pfw->listen_backlog <= 0)
+        pfw->listen_backlog = CONFIG_KEY_PFW_LISTENBACKLOG_DEFAULT;
 
       value = g_key_file_get_string(app->settings, pfw->name,
           CONFIG_KEY_PFW_FORWARD, NULL);
@@ -409,8 +450,12 @@ init_pfwds()
         {
           g_printerr("%s: %s\n", pfw->name, N_("invalid forward address"));
 
+          g_free(pfw->listen);
           g_free(pfw);
           g_strfreev(groups);
+          g_regex_unref(regex_unix);
+          g_regex_unref(regex_ipv4);
+          g_regex_unref(regex_ipv6);
 
           return NULL;
         }
@@ -427,11 +472,13 @@ init_pfwds()
                   N_("invalid IPv6 forward address"));
 
               g_match_info_free(match_info);
-              g_regex_unref(regex_ipv6);
               g_free(value);
-              g_free(pfw->listen_ip);
+              g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
@@ -444,56 +491,42 @@ init_pfwds()
 
               g_free(ipv6);
               g_match_info_free(match_info);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
               g_free(value);
-              g_free(pfw->listen_ip);
+              g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
 
-          if (pfw->af != AF_INET6)
-            {
-              g_printerr("%s: %s\n", pfw->name,
-                  N_("the addresses are not of the same family"));
-
-              g_free(ipv6);
-              g_match_info_free(match_info);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
-              g_free(value);
-              g_free(pfw->listen_ip);
-              g_free(pfw);
-              g_strfreev(groups);
-
-              return NULL;
-            }
-
-          pfw->forward_ip = ipv6;
+          pfw->forward = ipv6;
+          pfw->forward_af = AF_INET6;
         }
-      else
+
+      g_match_info_free(match_info);
+
+      if (g_regex_match(regex_ipv4, value, 0, &match_info))
         {
           struct in_addr in4;
           gchar *ipv4;
 
-          if (g_regex_match(regex_ipv4, value, 0, &match_info))
-            ipv4 = g_match_info_fetch(match_info, 0);
-          else
-            ipv4 = NULL;
+          ipv4 = g_match_info_fetch(match_info, 0);
           if (!ipv4)
             {
               g_printerr("%s: %s\n", pfw->name,
                   N_("invalid IPv4 forward address"));
 
               g_match_info_free(match_info);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
               g_free(value);
-              g_free(pfw->listen_ip);
+              g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
@@ -508,52 +541,77 @@ init_pfwds()
 
                   g_free(ipv4);
                   g_match_info_free(match_info);
-                  g_regex_unref(regex_ipv4);
-                  g_regex_unref(regex_ipv6);
                   g_free(value);
+                  g_free(pfw->listen);
                   g_free(pfw);
                   g_strfreev(groups);
+                  g_regex_unref(regex_unix);
+                  g_regex_unref(regex_ipv4);
+                  g_regex_unref(regex_ipv6);
 
                   return NULL;
                 }
             }
 
-          if (pfw->af != AF_INET)
+          pfw->forward = ipv4;
+          pfw->forward_af = AF_INET;
+        }
+
+      g_match_info_free(match_info);
+
+      if (g_regex_match(regex_unix, value, 0, &match_info))
+        {
+          gchar *path;
+
+          path = g_match_info_fetch(match_info, 1);
+          if (!path)
             {
               g_printerr("%s: %s\n", pfw->name,
-                  N_("the addresses are not of the same family"));
+                  N_("invalid UNIX forward path"));
 
-              g_free(ipv4);
               g_match_info_free(match_info);
-              g_regex_unref(regex_ipv4);
-              g_regex_unref(regex_ipv6);
               g_free(value);
-              g_free(pfw->listen_ip);
+              g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
 
-          pfw->forward_ip = ipv4;
+          pfw->forward = path;
+          pfw->forward_af = AF_UNIX;
         }
 
       g_match_info_free(match_info);
       g_free(value);
 
-      pfw->forward_port = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_FORWARDPORT, NULL);
-      if (pfw->forward_port == 0)
+      if (pfw->forward_af != AF_UNIX)
         {
-          g_printerr("%s: %s\n", pfw->name, N_("invalid forward port"));
+          pfw->forward_port = g_key_file_get_integer(app->settings, pfw->name,
+              CONFIG_KEY_PFW_FORWARDPORT, NULL);
+          if (pfw->forward_port == 0)
+            {
+              g_printerr("%s: %s\n", pfw->name, N_("invalid forward port"));
 
-          g_free(pfw->forward_ip);
-          g_free(pfw->listen_ip);
-          g_free(pfw);
-          g_strfreev(groups);
+              g_free(pfw->forward);
+              g_free(pfw->listen);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
-          return NULL;
+              return NULL;
+            }
         }
+
+      pfw->buffer_size = g_key_file_get_integer(app->settings, pfw->name,
+          CONFIG_KEY_PFW_BUFFERSIZE, NULL);
+      if (pfw->buffer_size < 4096)
+        pfw->buffer_size = CONFIG_KEY_PFW_BUFFERSIZE_DEFAULT;
 
       pfw->allow_ips = g_key_file_get_string_list(app->settings, pfw->name,
           CONFIG_KEY_PFW_ALLOW, NULL, NULL);
@@ -565,6 +623,9 @@ init_pfwds()
     }
 
   g_strfreev(groups);
+  g_regex_unref(regex_unix);
+  g_regex_unref(regex_ipv4);
+  g_regex_unref(regex_ipv6);
 
   return list;
 }
@@ -678,58 +739,81 @@ run_main_loop()
   GSList *item;
   pfw_t *pfw;
 
+  LOG_DEBUG("%s", N_("running main loop"));
+
   loop = ev_default_loop(EVFLAG_AUTO);
   if (!loop)
     {
-      LOG_ERROR("%s", N_("failed to initialize main event loop"));
+      LOG_ERROR("%s", N_("failed to retrieve main loop"));
 
       return FALSE;
     };
+
+  atexit(exit_main_loop);
 
   for (item = app->pfwds; item; item = item->next)
     {
       pfw = (pfw_t *) item->data;
 
-      run_child_loop(pfw);
+      if (!start_pfwd(pfw))
+        continue;
     }
 
-  atexit(exit_main_loop);
   ev_loop(loop, 0);
 
   return TRUE;
 }
 
-gboolean
-run_child_loop(pfw_t *pfw)
+static void
+exit_main_loop(void)
 {
-  pfw->ev_loop = ev_loop_new(EVFLAG_AUTO);
+  GSList *item;
+  pfw_t *pfw;
+
+  LOG_DEBUG("%s", N_("exiting main loop"));
+
+  for (item = app->pfwds; item; item = item->next)
+    {
+      pfw = (pfw_t *) item->data;
+
+      stop_pfwd(pfw);
+    }
+
+  ev_default_destroy();
+}
+
+static gboolean
+start_pfwd(pfw_t *pfw)
+{
+  LOG_DEBUG("%s: %s", pfw->name, "starting redirector");
+
+  pfw->ev_loop = ev_default_loop(EVFLAG_AUTO);
   if (!pfw->ev_loop)
     {
-      LOG_ERROR("%s: %s", pfw->name, "failed to initialize child event loop");
+      LOG_ERROR("%s: %s", pfw->name, "failed to retrieve main loop");
 
       return FALSE;
     };
 
-  LOG_DEBUG("%s: %s", pfw->name, N_("child event loop initialized"));
-
-  if (pfw->af == AF_INET6)
+  if (pfw->listen_af == AF_INET6)
     {
       struct sockaddr_in6 saddr6;
-      gint opt;
+      gint opt, flags;
 
       memset(&saddr6, 0, sizeof (struct sockaddr_in6));
       saddr6.sin6_family = AF_INET6;
       saddr6.sin6_port = htons(pfw->listen_port);
 
-      if (strcmp(pfw->listen_ip, IPV6_ANY) == 0)
+      if (strcmp(pfw->listen, IPV6_ANY) == 0)
         saddr6.sin6_addr = in6addr_any;
       else
-        inet_pton(AF_INET6, pfw->listen_ip, &saddr6.sin6_addr);
+        inet_pton(AF_INET6, pfw->listen, &saddr6.sin6_addr);
 
       pfw->fd = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
       if (pfw->fd < 0)
         {
-          LOG_ERROR("%s: %s", pfw->name, N_("failed to create client socket"));
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to create local IPv6 socket"));
 
           return FALSE;
         }
@@ -741,38 +825,41 @@ run_child_loop(pfw_t *pfw)
       if (bind(pfw->fd, (struct sockaddr *) &saddr6,
           sizeof(struct sockaddr_in6)) < 0)
         {
-          LOG_ERROR("%s: %s", pfw->name, N_("failed to bind client socket"));
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to bind local IPv6 socket"));
 
           return FALSE;
         }
 
-      if (listen(pfw->fd, pfw->backlog) < 0)
+      if (listen(pfw->fd, pfw->listen_backlog) < 0)
         {
-          LOG_ERROR("%s", N_("Failed to listen on client socket"));
+          LOG_ERROR("%s", N_("Failed to listen on local IPv6 socket"));
 
           return FALSE;
         }
 
-      fcntl(pfw->fd, F_SETFL, O_NONBLOCK);
+      flags = fcntl(pfw->fd, F_GETFL, 0);
+      fcntl(pfw->fd, F_SETFL, flags | O_NONBLOCK);
     }
-  else
+  else if (pfw->listen_af == AF_INET)
     {
       struct sockaddr_in saddr4;
-      gint opt;
+      gint opt, flags;
 
       memset(&saddr4, 0, sizeof (struct sockaddr_in));
       saddr4.sin_family = AF_INET;
       saddr4.sin_port = htons(pfw->listen_port);
 
-      if (strcmp(pfw->listen_ip, IPV4_ANY) == 0)
+      if (strcmp(pfw->listen, IPV4_ANY) == 0)
         saddr4.sin_addr.s_addr = INADDR_ANY;
       else
-        inet_pton(AF_INET, pfw->listen_ip, &saddr4.sin_addr);
+        inet_pton(AF_INET, pfw->listen, &saddr4.sin_addr);
 
       pfw->fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
       if (pfw->fd < 0)
         {
-          LOG_ERROR("%s: %s", pfw->name, N_("failed to create client socket"));
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to create local IPv4 socket"));
 
           return FALSE;
         }
@@ -784,80 +871,200 @@ run_child_loop(pfw_t *pfw)
       if (bind(pfw->fd, (struct sockaddr *) &saddr4, sizeof(struct sockaddr_in))
           < 0)
         {
-          LOG_ERROR("%s: %s", pfw->name, N_("failed to bind client socket"));
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to bind local IPv4 socket"));
 
           return FALSE;
         }
 
-      if (listen(pfw->fd, pfw->backlog) < 0)
+      if (listen(pfw->fd, pfw->listen_backlog) < 0)
         {
           LOG_ERROR("%s: %s",
-              pfw->name, N_("failed to listen on client socket"));
+              pfw->name, N_("failed to listen on local IPv4 socket"));
 
           return FALSE;
         }
 
-      fcntl(pfw->fd, F_SETFL, O_NONBLOCK);
+      flags = fcntl(pfw->fd, F_GETFL, 0);
+      fcntl(pfw->fd, F_SETFL, flags | O_NONBLOCK);
+    }
+  else /*if (pfw->listen_af == AF_UNIX)*/
+    {
+      struct sockaddr_un sun;
+      gint flags;
+
+      memset(&sun, 0, sizeof (struct sockaddr_un));
+      sun.sun_family = AF_UNIX;
+      strcpy(sun.sun_path, pfw->listen);
+
+      pfw->fd = socket(AF_UNIX, SOCK_STREAM, 0);
+      if (pfw->fd < 0)
+        {
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to create local UNIX socket"));
+
+          return FALSE;
+        }
+
+      if (bind(pfw->fd, (struct sockaddr *) &sun, sizeof(struct sockaddr_un))
+          < 0)
+        {
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to bind local UNIX socket"));
+
+          return FALSE;
+        }
+
+      if (listen(pfw->fd, pfw->listen_backlog) < 0)
+        {
+          LOG_ERROR("%s: %s",
+              pfw->name, N_("failed to listen on local UNIX socket"));
+
+          return FALSE;
+        }
+
+      flags = fcntl(pfw->fd, F_GETFL, 0);
+      fcntl(pfw->fd, F_SETFL, flags | O_NONBLOCK);
     }
 
   pfw->w = g_new0(ev_io, 1);
   pfw->w->data = pfw;
-  ev_io_init(pfw->w, accept_event, pfw->fd, EV_READ);
+  ev_io_init(pfw->w, pfwd_accept_event, pfw->fd, EV_READ);
   LOG_DEBUG("%s: %s (pfw=%p)", pfw->name, N_("accept watcher created"), pfw);
 
   ev_io_start(pfw->ev_loop, pfw->w);
   LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
       pfw->name, N_("accept watcher started"), pfw->w->fd, pfw->w->data);
 
-  if (pfw->af == AF_INET6)
-    LOG_INFO("%s: %s ([%s]:%hu)",
-        pfw->name, N_("socket is listening"), pfw->listen_ip, pfw->listen_port);
-  else
-    LOG_INFO("%s: %s (%s:%hu)",
-        pfw->name, N_("socket is listening"), pfw->listen_ip, pfw->listen_port);
-
-  ev_loop(pfw->ev_loop, 0);
+  if (pfw->listen_af == AF_INET6)
+    {
+      LOG_INFO("%s: %s ([%s]:%hu)",
+          pfw->name, N_("socket is listening"), pfw->listen, pfw->listen_port);
+    }
+  else if (pfw->listen_af == AF_INET)
+    {
+      LOG_INFO("%s: %s (%s:%hu)",
+          pfw->name, N_("socket is listening"), pfw->listen, pfw->listen_port);
+    }
+  else /*if (pfw->listen_af == AF_UNIX)*/
+    {
+      LOG_INFO("%s: %s (unix:%s)",
+          pfw->name, N_("socket is listening"), pfw->listen);
+    }
 
   return TRUE;
 }
 
 static void
-exit_main_loop(void)
+stop_pfwd(pfw_t *pfw)
 {
-  GSList *item;
-  pfw_t *pfw;
+  LOG_DEBUG("%s: %s", pfw->name, "stopping redirector");
 
-  LOG_DEBUG("%s", N_("exit main loop event"));
-
-  for (item = app->pfwds; item; item = item->next)
+  if (pfw->w)
     {
-      pfw = (pfw_t *) item->data;
-
-      ev_io_stop(pfw->ev_loop, pfw->w);
-      LOG_DEBUG("%s: %s", pfw->name, N_("watcher stopped"));
-
-      close(pfw->fd);
+      if (ev_is_active(pfw->w))
+        {
+          ev_io_stop(pfw->ev_loop, pfw->w);
+        }
 
       g_free(pfw->w);
-      LOG_DEBUG("%s: %s", pfw->name, N_("watcher cleaned"));
 
-      if (pfw->af == AF_INET6)
-        LOG_INFO("%s: %s [%s]:%hu",
-            pfw->name, N_("socket closed"), pfw->listen_ip, pfw->listen_port);
-      else
-        LOG_INFO("%s: %s %s:%hu",
-            pfw->name, N_("socket closed"), pfw->listen_ip, pfw->listen_port);
-
-      ev_loop_destroy(pfw->ev_loop);
-      LOG_DEBUG("%s: %s", pfw->name, N_("child event loop destroyed"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("accept watcher stopped"));
     }
 
-  ev_loop_destroy(EV_DEFAULT_UC);
-  LOG_DEBUG("%s", N_("main event loop destroyed"));
+  if (pfw->s_ws)
+    {
+      GSList *item;
+      ev_io *ev;
+      pfw_io_t *pfw_io;
+
+      for (item = pfw->s_ws; item; item = item->next)
+        {
+          ev = (ev_io *) item->data;
+          if (!ev)
+            continue;
+
+          if (ev->data)
+            {
+              pfw_io = (pfw_io_t *) ev->data;
+
+              if (pfw_io->buf)
+                {
+                  g_free(pfw_io->buf);
+                }
+            }
+
+          g_free(ev);
+        }
+
+      g_slist_free(pfw->s_ws);
+
+      LOG_DEBUG("%s: %s", pfw->name, N_("server read watchers stopped"));
+    }
+
+  if (pfw->c_ws)
+    {
+      GSList *item;
+      ev_io *ev;
+      pfw_io_t *pfw_io;
+
+      for (item = pfw->c_ws; item; item = item->next)
+        {
+          ev = (ev_io *) item->data;
+          if (!ev)
+            continue;
+
+          if (ev_is_active(ev))
+            {
+              ev_io_stop(pfw->ev_loop, ev);
+            }
+
+          if (ev->data)
+            {
+              pfw_io = (pfw_io_t *) ev->data;
+
+              close(pfw_io->s_fd);
+              close(pfw_io->c_fd);
+
+              if (pfw_io->buf)
+                g_free(pfw_io->buf);
+            }
+
+          g_free(ev);
+        }
+
+      g_slist_free(pfw->c_ws);
+
+      LOG_DEBUG("%s: %s", pfw->name, N_("client read watchers stopped"));
+    }
+
+  if (pfw->fd)
+    {
+      close(pfw->fd);
+
+      if (pfw->listen_af == AF_UNIX)
+        unlink(pfw->listen);
+
+      if (pfw->listen_af == AF_INET6)
+        {
+          LOG_INFO("%s: %s ([%s]:%hu)",
+              pfw->name, N_("socket closed"), pfw->listen, pfw->listen_port);
+        }
+      else if (pfw->listen_af == AF_INET)
+        {
+          LOG_INFO("%s: %s (%s:%hu)",
+              pfw->name, N_("socket closed"), pfw->listen, pfw->listen_port);
+        }
+      else if (pfw->listen_af == AF_UNIX)
+        {
+          LOG_INFO("%s: %s (unix:%s)",
+              pfw->name, N_("socket closed"), pfw->listen);
+        }
+    }
 }
 
 static void
-accept_event(EV_P_ ev_io *w, gint revents)
+pfwd_accept_event(EV_P_ ev_io *w, gint revents)
   {
     LOG_DEBUG("%s (fd=%d, data=%p)",
         N_("new accept event"), w->fd,w->data);
@@ -865,12 +1072,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
     pfw_t *pfw = (pfw_t *)w->data;
     if (pfw == NULL)
       {
-        LOG_ERROR("%s", N_("no data found, ignoring event"));
-
-        ev_io_stop(EV_DEFAULT_UC, w);
-        LOG_DEBUG("%s", N_("watcher stopped"));
-
-        g_free(w);
+        LOG_ERROR("%s", N_("no data found, ignoring accept event"));
 
         return;
       }
@@ -879,14 +1081,16 @@ accept_event(EV_P_ ev_io *w, gint revents)
     pfw_io_t *c_data, *s_data;
     gint c, s;
     gchar c_ip[IPV6_MAXLEN];
-    short c_port;
+    short c_port = 0;
     gchar *ip;
 
-    if (pfw->af == AF_INET6)
+    memset(c_ip, 0, sizeof(c_ip));
+
+    if (pfw->listen_af == AF_INET6)
       {
         struct sockaddr_in6 sin6;
         socklen_t len;
-        gint opt;
+        gint flags, opt;
 
         memset(&sin6, 0, sizeof (struct sockaddr_in6));
         len = sizeof(struct sockaddr_in6);
@@ -895,7 +1099,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (c < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to accept new client"));
+                pfw->name, N_("failed to accept new IPv6 client"));
 
             return;
           }
@@ -903,7 +1107,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (!inet_ntop(AF_INET6, &sin6.sin6_addr, c_ip, sizeof(c_ip)))
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to resolv client address"));
+                pfw->name, N_("failed to resolv IPv6 client address"));
 
             close(c);
 
@@ -916,7 +1120,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (!pfwd_check_access(pfw, c_ip))
           {
             LOG_INFO("%s: %s (%s)",
-                pfw->name, N_("client address denied"), ip);
+                pfw->name, N_("IPv6 client address denied"), ip);
 
             g_free(ip);
             close(c);
@@ -925,19 +1129,101 @@ accept_event(EV_P_ ev_io *w, gint revents)
           }
 
         LOG_INFO("%s: %s (%s)",
-            pfw->name, N_("client address allowed"), ip);
+            pfw->name, N_("IPv6 client address allowed"), ip);
 
         g_free(ip);
 
-        fcntl(c, F_SETFL, O_NONBLOCK);
+        flags = fcntl(c, F_GETFL, 0);
+        fcntl(c, F_SETFL, flags | O_NONBLOCK);
         opt = 0;
         setsockopt(c, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
+      }
+    else if (pfw->listen_af == AF_INET)
+      {
+        struct sockaddr_in sin4;
+        socklen_t len;
+        gint flags, opt;
+
+        memset(&sin4, 0, sizeof (struct sockaddr_in));
+        len = sizeof(struct sockaddr_in);
+
+        c = accept(w->fd, (struct sockaddr *) &sin4, &len);
+        if (c < 0)
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to accept new IPv4 client"));
+
+            return;
+          }
+
+        if (!inet_ntop(AF_INET, &sin4.sin_addr, c_ip, sizeof(c_ip)))
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to resolv IPv4 client address"));
+
+            close(c);
+
+            return;
+          }
+
+        c_port = htons(sin4.sin_port);
+
+        ip = g_strdup_printf("%s", c_ip);
+        if (!pfwd_check_access(pfw, c_ip))
+          {
+            LOG_INFO("%s: %s (%s)",
+                pfw->name, N_("IPv4 client address denied"), ip);
+
+            g_free(ip);
+            close(c);
+
+            return;
+          }
+
+        LOG_INFO("%s: %s (%s)",
+            pfw->name, N_("IPv4 client address allowed"), ip);
+
+        g_free(ip);
+
+        flags = fcntl(c, F_GETFL, 0);
+        fcntl(c, F_SETFL, flags | O_NONBLOCK);
+        opt = 0;
+        setsockopt(c, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
+      }
+    else /*if (pfw->listen_af == AF_UNIX)*/
+      {
+        struct sockaddr_un sun;
+        socklen_t len;
+        gint flags, opt;
+
+        memset(&sun, 0, sizeof (struct sockaddr_un));
+        len = sizeof(struct sockaddr_un);
+
+        c = accept(w->fd, (struct sockaddr *) &sun, &len);
+        if (c < 0)
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to accept new UNIX client"));
+
+            return;
+          }
+
+        flags = fcntl(c, F_GETFL, 0);
+        fcntl(c, F_SETFL, flags | O_NONBLOCK);
+        opt = 0;
+        setsockopt(c, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
+      }
+
+    if (pfw->forward_af == AF_INET6)
+      {
+        struct sockaddr_in6 sin6;
+        gint flags, opt;
 
         s = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
         if (s < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to create server socket"));
+                pfw->name, N_("failed to create remote IPv6 socket"));
 
             close(c);
 
@@ -951,7 +1237,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (bind(s, (struct sockaddr *) &sin6, sizeof(struct sockaddr_in6)) < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to bind server socket"));
+                pfw->name, N_("failed to bind remote IPv6 socket"));
 
             close(s);
             close(c);
@@ -959,17 +1245,21 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        if (strcmp(pfw->forward_ip, IPV6_ANY) == 0)
-        sin6.sin6_addr = in6addr_any;
+        if (strcmp(pfw->forward, IPV6_ANY) == 0)
+          {
+            sin6.sin6_addr = in6addr_any;
+          }
         else
-        inet_pton(AF_INET6, pfw->forward_ip, &sin6.sin6_addr);
-        sin6.sin6_port = htons(pfw->forward_port);
+          {
+            inet_pton(AF_INET6, pfw->forward, &sin6.sin6_addr);
+            sin6.sin6_port = htons(pfw->forward_port);
+          }
 
         if (connect(s, (struct sockaddr *) &sin6,
                 sizeof(struct sockaddr_in6)) < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to connect server socket"));
+                pfw->name, N_("failed to connect remote IPv6 socket"));
 
             close(s);
             close(c);
@@ -977,66 +1267,21 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        fcntl(s, F_SETFL, O_NONBLOCK);
+        flags = fcntl(s, F_GETFL, 0);
+        fcntl(s, F_SETFL, flags | O_NONBLOCK);
         opt = 0;
         setsockopt(s, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
       }
-    else
+    else if (pfw->forward_af == AF_INET)
       {
         struct sockaddr_in sin4;
-        socklen_t len;
-        gint opt;
-
-        memset(&sin4, 0, sizeof (struct sockaddr_in));
-        len = sizeof(struct sockaddr_in);
-
-        c = accept(w->fd, (struct sockaddr *) &sin4, &len);
-        if (c < 0)
-          {
-            LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to accept new client"));
-
-            return;
-          }
-
-        if (!inet_ntop(AF_INET, &sin4.sin_addr, c_ip, sizeof(c_ip)))
-          {
-            LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to resolv client address"));
-
-            close(c);
-
-            return;
-          }
-
-        c_port = htons(sin4.sin_port);
-
-        ip = g_strdup_printf("%s", c_ip);
-        if (!pfwd_check_access(pfw, c_ip))
-          {
-            LOG_INFO("%s: %s (%s)",
-                pfw->name, N_("client address denied"), ip);
-
-            g_free(ip);
-            close(c);
-
-            return;
-          }
-
-        LOG_INFO("%s: %s (%s)",
-            pfw->name, N_("client address allowed"), ip);
-
-        g_free(ip);
-
-        fcntl(c, F_SETFL, O_NONBLOCK);
-        opt = 0;
-        setsockopt(c, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
+        gint flags, opt;
 
         s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         if (s < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to create server socket"));
+                pfw->name, N_("failed to create remote IPv4 socket"));
 
             close(c);
 
@@ -1050,7 +1295,7 @@ accept_event(EV_P_ ev_io *w, gint revents)
         if (bind(s, (struct sockaddr *) &sin4, sizeof(struct sockaddr_in)) < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to bind server socket"));
+                pfw->name, N_("failed to bind remote IPv4 socket"));
 
             close(s);
             close(c);
@@ -1058,14 +1303,14 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        inet_pton(AF_INET, pfw->forward_ip, &(sin4.sin_addr));
+        inet_pton(AF_INET, pfw->forward, &(sin4.sin_addr));
         sin4.sin_port = htons(pfw->forward_port);
 
         if (connect(s, (struct sockaddr *) &sin4, sizeof(struct sockaddr_in))
             < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to connect server socket"));
+                pfw->name, N_("failed to connect remote IPv4 socket"));
 
             close(s);
             close(c);
@@ -1073,7 +1318,56 @@ accept_event(EV_P_ ev_io *w, gint revents)
             return;
           }
 
-        fcntl(s, F_SETFL, O_NONBLOCK);
+        flags = fcntl(s, F_GETFL, 0);
+        fcntl(s, F_SETFL, flags | O_NONBLOCK);
+        opt = 0;
+        setsockopt(s, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
+      }
+    else /*if (pfw->forward_af == AF_UNIX)*/
+      {
+        struct sockaddr_un sun;
+        gint flags, opt;
+
+        s = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (s < 0)
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to create remote UNIX socket"));
+
+            close(c);
+
+            return;
+          }
+
+        memset(&sun, 0, sizeof(struct sockaddr_un));
+        sun.sun_family = AF_UNIX;
+        strcpy(sun.sun_path, pfw->forward);
+
+        if (bind(s, (struct sockaddr *) &sun, sizeof(struct sockaddr_un)) < 0)
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to bind remote UNIX socket"));
+
+            close(s);
+            close(c);
+
+            return;
+          }
+
+        if (connect(s, (struct sockaddr *) &sun, sizeof(struct sockaddr_un))
+            < 0)
+          {
+            LOG_ERROR("%s: %s",
+                pfw->name, N_("failed to connect remote UNIX socket"));
+
+            close(s);
+            close(c);
+
+            return;
+          }
+
+        flags = fcntl(s, F_GETFL, 0);
+        fcntl(s, F_SETFL, flags | O_NONBLOCK);
         opt = 0;
         setsockopt(s, SOL_SOCKET, SO_LINGER, &opt, sizeof(opt));
       }
@@ -1086,15 +1380,19 @@ accept_event(EV_P_ ev_io *w, gint revents)
     g_strlcpy(c_data->c_ip, c_ip, sizeof(c_data->c_ip));
     c_data->c_port = c_port;
     c_data->s_fd = s;
-    c_data->buf = g_new0(gchar, pfw->buf_size);
-    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
-        pfw->name, N_("client watcher created"), c_data->c_fd, c_data->s_fd,
-        c_data->buf, pfw->buf_size);
+    c_data->buf = (gchar *)g_malloc0(pfw->buffer_size);
 
-    ev_io_init(c_w, read_event, c, EV_READ);
+    pfw->c_ws = g_slist_append(pfw->c_ws, c_w);
+
+    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_len=%d)",
+        pfw->name, N_("client read watcher created"), c_data->c_fd, c_data->s_fd,
+        c_data->buf, pfw->buffer_size);
+
+    ev_io_init(c_w, pfwd_read_event, c, EV_READ);
     ev_io_start(pfw->ev_loop, c_w);
+
     LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
-        pfw->name, N_("client watcher started"),
+        pfw->name, N_("client read watcher started"),
         c_w->fd, c_w->data);
 
     s_w = g_new0(ev_io, 1);
@@ -1105,72 +1403,109 @@ accept_event(EV_P_ ev_io *w, gint revents)
     g_strlcpy(s_data->c_ip, c_ip, sizeof(c_data->c_ip));
     s_data->c_port = c_port;
     s_data->s_fd = s;
-    s_data->buf = g_new0(gchar, pfw->buf_size);
-    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_size=%d)",
-        pfw->name, N_("server watcher created"), s_data->c_fd, s_data->s_fd,
-        s_data->buf, pfw->buf_size);
+    s_data->buf = (gchar *)g_malloc0(pfw->buffer_size);
 
-    ev_io_init(s_w, read_event, s, EV_READ);
+    pfw->s_ws = g_slist_append(pfw->s_ws, s_w);
+
+    LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d, buf=%p, buf_len=%d)",
+        pfw->name, N_("server read watcher created"), s_data->c_fd, s_data->s_fd,
+        s_data->buf, pfw->buffer_size);
+
+    ev_io_init(s_w, pfwd_read_event, s, EV_READ);
     ev_io_start(pfw->ev_loop, s_w);
-    LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
-        pfw->name, N_("server watcher started"), s_w->fd, s_w->data);
 
-    if (pfw->af == AF_INET6)
-    LOG_INFO("%s: %s ([%s]:%hu => [%s]:%hu)",
-        pfw->name, N_("new client connection"),
-        c_ip, c_port, pfw->forward_ip, pfw->forward_port);
-    else
-    LOG_INFO("%s: %s (%s:%hu => %s:%hu)",
-        pfw->name, N_("new client connection"),
-        c_ip, c_port, pfw->forward_ip, pfw->forward_port);
+    LOG_DEBUG("%s: %s (fd=%d, event=EV_READ, data=%p)",
+        pfw->name, N_("server read watcher started"), s_w->fd, s_w->data);
+
+    if (pfw->listen_af == AF_INET6)
+      {
+        LOG_INFO("%s: %s ([%s]:%hu)",
+            pfw->name, N_("new client connection"),
+            c_ip, c_port);
+      }
+    else if (pfw->listen_af == AF_INET)
+      {
+        LOG_INFO("%s: %s (%s:%hu)",
+            pfw->name, N_("new client connection"),
+            c_ip, c_port);
+      }
+    else /*if (pfw->listen_af == AF_UNIX)*/
+      {
+        LOG_INFO("%s: %s",
+            pfw->name, N_("new client connection"));
+      }
   }
 
 static void
-read_event(EV_P_ ev_io *w, gint revents)
+pfwd_read_event(EV_P_ ev_io *w, gint revents)
   {
     LOG_DEBUG("%s (fd=%d, data=%p)",
-        N_("new read event"), w->fd, w->data);
+    N_("new read event"), w->fd, w->data);
 
-    gint n;
+    gint nread, nwrite, i;
 
     pfw_io_t *pfw_io = (pfw_io_t *)w->data;
     if (pfw_io == NULL)
       {
-        LOG_ERROR("%s", N_("no data found, ignoring event"));
-
-        ev_io_stop(EV_DEFAULT_UC, w);
-        LOG_DEBUG("%s", N_("watcher stopped"));
-
-        g_free(w);
+        LOG_ERROR("%s", N_("no data found, ignoring read event"));
 
         return;
       }
 
     LOG_DEBUG("%s: %s (c_fd=%d, s_fd=%d)",
-        pfw_io->pfw->name, N_("event data"), pfw_io->c_fd, pfw_io->s_fd);
+    pfw_io->pfw->name, N_("read event data"), pfw_io->c_fd, pfw_io->s_fd);
 
-    n = read(w->fd, pfw_io->buf, pfw_io->pfw->buf_size);
-    LOG_DEBUG("%s: %s=%d", pfw_io->pfw->name, N_("bytes readed"), n);
-    if (n <= 0)
+    nread= read(w->fd, pfw_io->buf, pfw_io->pfw->buffer_size);
+    if (nread >= 0)
       {
+        LOG_DEBUG("%s: %s=%d", pfw_io->pfw->name, N_("bytes readed"), nread);
+      }
+
+    if (nread <= 0)
+      {
+        if (nread < 0)
+          {
+            LOG_DEBUG("%s: %s (%s)", pfw_io->pfw->name, N_("read error"), g_strerror(errno));
+
+            if (errno == EAGAIN)
+              {
+                return;
+              }
+          }
+
         ev_io_stop(pfw_io->pfw->ev_loop, w);
-        LOG_DEBUG("%s: %s", pfw_io->pfw->name, N_("watcher stopped"));
+        LOG_DEBUG("%s: %s", pfw_io->pfw->name, N_("read watcher stopped"));
 
         close(pfw_io->s_fd);
         close(pfw_io->c_fd);
 
         if (w->fd == pfw_io->c_fd)
           {
-            if (pfw_io->pfw->af == AF_INET6)
-            LOG_INFO("%s: %s ([%s]:%hu => [%s]:%hu)",
+            if (pfw_io->pfw->listen_af == AF_INET6)
+              {
+                LOG_INFO("%s: %s ([%s]:%hu)",
                 pfw_io->pfw->name, N_("client connection closed"),
-                pfw_io->c_ip, pfw_io->c_port, pfw_io->pfw->forward_ip,
-                pfw_io->pfw->forward_port);
-            else
-            LOG_INFO("%s: %s (%s:%hu => %s:%hu)",
+                pfw_io->c_ip, pfw_io->c_port);
+              }
+            else if (pfw_io->pfw->listen_af == AF_INET)
+              {
+                LOG_INFO("%s: %s (%s:%hu)",
                 pfw_io->pfw->name, N_("client connection closed"),
-                pfw_io->c_ip, pfw_io->c_port, pfw_io->pfw->forward_ip,
-                pfw_io->pfw->forward_port);
+                pfw_io->c_ip, pfw_io->c_port);
+              }
+            else /*if (pfw_io->pfw->listen_af == AF_UNIX)*/
+              {
+                LOG_INFO("%s: %s",
+                pfw_io->pfw->name, N_("client connection closed"));
+              }
+
+            pfw_io->pfw->c_ws = g_slist_remove(pfw_io->pfw->c_ws, w);
+          }
+        else /*if (w->fd == pfw_io->s_fd) */
+          {
+            LOG_INFO("%s: %s", pfw_io->pfw->name, N_("server connection closed"));
+
+            pfw_io->pfw->s_ws = g_slist_remove(pfw_io->pfw->s_ws, w);
           }
 
         g_free(pfw_io->buf);
@@ -1180,12 +1515,36 @@ read_event(EV_P_ ev_io *w, gint revents)
         return;
       }
 
-    if (w->fd == pfw_io->c_fd)
-    n = write(pfw_io->s_fd, pfw_io->buf, n);
-    else
-    n = write(pfw_io->c_fd, pfw_io->buf, n);
-    LOG_DEBUG("%s: %s=%d", pfw_io->pfw->name, N_("bytes written"),
-        n);
+    for (i=0; i < nread; i += nwrite)
+      {
+        if (w->fd == pfw_io->c_fd)
+          {
+            nwrite = write(pfw_io->s_fd, pfw_io->buf + i, nread - i);
+          }
+        else
+          {
+            nwrite = write(pfw_io->c_fd, pfw_io->buf + i, nread - i);
+          }
+
+        if (nwrite >= 0)
+          {
+            LOG_DEBUG("%s: %s=%d",
+            pfw_io->pfw->name, N_("bytes written"), nwrite);
+          }
+
+        if (nwrite < 0)
+          {
+            LOG_DEBUG("%s: %s (%s)",
+            pfw_io->pfw->name, N_("write error"), g_strerror(errno));
+
+            if (errno == EAGAIN)
+              {
+                nwrite = 0;
+
+                continue;
+              }
+          }
+      }
   }
 
 gboolean
@@ -1203,7 +1562,7 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
         {
           if (g_pattern_match_simple(pfw->deny_ips[i], ip))
             {
-              LOG_DEBUG("%s (%s)", N_("address matches deny rule"), ip);
+              LOG_DEBUG("%s (%s)", N_("IP address matches deny rule"), ip);
 
               return FALSE;
             }
@@ -1218,7 +1577,7 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
         {
           if (g_pattern_match_simple(pfw->allow_ips[i], ip))
             {
-              LOG_DEBUG("%s (%s)", N_("address matches allow rule"), ip);
+              LOG_DEBUG("%s (%s)", N_("IP address matches allow rule"), ip);
 
               return TRUE;
             }
@@ -1227,12 +1586,12 @@ pfwd_check_access(pfw_t *pfw, gchar *ip)
 
   if (allow)
     {
-      LOG_DEBUG("%s (%s)", N_("address matches default deny rule"), ip);
+      LOG_DEBUG("%s (%s)", N_("IP address matches default deny rule"), ip);
 
       return FALSE;
     }
 
-  LOG_DEBUG("%s (%s)", N_("address matches default allow rule"), ip);
+  LOG_DEBUG("%s (%s)", N_("IP address matches default allow rule"), ip);
 
   return TRUE;
 }
@@ -1338,6 +1697,9 @@ cleanup(void)
   gboolean daemon;
   GError *error = NULL;
 
+  if (app->logger)
+    LOG_DEBUG("%s", N_("cleanup"));
+
   if (app->settings && app->daemon)
     {
       daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
@@ -1375,8 +1737,8 @@ cleanup(void)
             continue;
 
           g_free(pfw->name);
-          g_free(pfw->listen_ip);
-          g_free(pfw->forward_ip);
+          g_free(pfw->listen);
+          g_free(pfw->forward);
           g_strfreev(pfw->allow_ips);
           g_strfreev(pfw->deny_ips);
           g_free(pfw);
@@ -1431,6 +1793,8 @@ main(gint argc, gchar *argv[])
     {
       gchar *pid_file, *user, *group;
 
+      pid_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
+          CONFIG_KEY_MAIN_PIDFILE, NULL);
       if (!pid_file)
         pid_file = g_strdup(CONFIG_KEY_MAIN_PIDFILE_DEFAULT);
 

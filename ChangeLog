@@ -1,7 +1,8 @@
-2012-02-22 Boris HUISGEN <bhuisgen@hbis.fr>
+2012-02-28 Boris HUISGEN <bhuisgen@hbis.fr>
 
+	* pfwd.c: allow forwarding independently of the socket type.
+	* pfwd.c: add UNIX socket support.
 	* pfwd.c: add allow/deny rules support.
-	* pfwd.c: fix close sockets on error.
 
 2011-04-16 Boris HUISGEN <bhuisgen@hbis.fr>
 

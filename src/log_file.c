@@ -52,6 +52,7 @@ void
 _log_handler_file_cleanup(handler_t *handler)
 {
   _log_handler_free_options(handler);
+  free(handler);
 }
 
 void

@@ -58,14 +58,15 @@
 #define CONFIG_KEY_MAIN_SYSLOGFACILITY_DEFAULT  "DAEMON";
 #define CONFIG_KEY_PFW_LISTEN                   "Listen"
 #define CONFIG_KEY_PFW_LISTENPORT               "ListenPort"
-#define CONFIG_KEY_PFW_BACKLOG                  "Backlog"
-#define CONFIG_KEY_PFW_BACKLOG_DEFAULT          10
-#define CONFIG_KEY_PFW_BUFFER                   "Buffer"
-#define CONFIG_KEY_PFW_BUFFER_DEFAULT           4096
+#define CONFIG_KEY_PFW_LISTENBACKLOG            "ListenBacklog"
+#define CONFIG_KEY_PFW_LISTENBACKLOG_DEFAULT    10
 #define CONFIG_KEY_PFW_FORWARD                  "Forward"
 #define CONFIG_KEY_PFW_FORWARDPORT              "ForwardPort"
+#define CONFIG_KEY_PFW_BUFFERSIZE               "BufferSize"
+#define CONFIG_KEY_PFW_BUFFERSIZE_DEFAULT       4096
 #define CONFIG_KEY_PFW_ALLOW                    "Allow"
 #define CONFIG_KEY_PFW_DENY                     "Deny"
+
 
 typedef struct _application_t
 {

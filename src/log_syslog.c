@@ -155,6 +155,7 @@ _log_handler_syslog_cleanup(handler_t *handler)
   closelog();
 
   _log_handler_free_options(handler);
+  free(handler);
 }
 
 LogSyslogFacility
