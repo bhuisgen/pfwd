@@ -24,8 +24,6 @@
 #define LOG_HANDLER_CONSOLE_OPTION_LOGALLTOSTDOUT       "FileHandler.LogAllToOutputStream"
 #define LOG_HANDLER_CONSOLE_OPTION_LOGALLTOSTDERR       "FileHandler.LogAllToErrorStream"
 
-handler_t *
-log_handler_console_create();
 void
 _log_handler_console_init(handler_t *handler);
 void

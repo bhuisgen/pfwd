@@ -44,21 +44,6 @@ static struct
     { "LOCAL6", LOG_SYSLOG_FACILITY_LOCAL6 },
     { "LOCAL7", LOG_SYSLOG_FACILITY_LOCAL7 } };
 
-handler_t *
-log_handler_syslog_create()
-{
-  handler_t *handler = malloc(sizeof(handler_t));
-  if (!handler)
-    return NULL;
-
-  memset (handler, 0, sizeof(handler_t));
-
-  handler->type = LOG_HANDLER_TYPE_SYSLOG;
-  handler->options = NULL;
-
-  return handler;
-}
-
 void
 _log_handler_syslog_init(handler_t *handler)
 {
@@ -153,9 +138,6 @@ void
 _log_handler_syslog_cleanup(handler_t *handler)
 {
   closelog();
-
-  _log_handler_free_options(handler);
-  free(handler);
 }
 
 LogSyslogFacility

@@ -44,6 +44,165 @@ static struct
     { "INFO", LOG_LEVEL_INFO },
     { "DEBUG", LOG_LEVEL_DEBUG }, };
 
+void
+_log_handler_free_options(handler_t *handler);
+
+handler_t *
+log_handler_create(int type)
+{
+  handler_t *handler = malloc(sizeof(handler_t));
+  if (!handler)
+    return NULL;
+
+  memset (handler, 0, sizeof(handler_t));
+
+  handler->type = type;
+  handler->options = NULL;
+
+  return handler;
+}
+
+void
+log_handler_destroy(handler_t *handler)
+{
+  _log_handler_free_options(handler);
+  free(handler);
+}
+
+char *
+log_handler_get_option(handler_t *handler, const char *name)
+{
+  handler_option_t *option = NULL;
+  char *value = NULL;
+
+  for (option = handler->options; option; option = option->next)
+    {
+      if (strcmp(option->name, name) == 0)
+        {
+          value = option->value;
+
+          break;
+        }
+    }
+
+  return value;
+}
+
+int
+log_handler_set_option(handler_t *handler, const char *name, const char *value)
+{
+  handler_option_t *option;
+  int ret = -1;
+
+  option = handler->options;
+
+  do
+    {
+      if (!option)
+        {
+          option = malloc(sizeof(handler_option_t));
+          if (!option)
+            break;
+
+          memset(option, 0, sizeof (handler_option_t));
+
+          option->name = strdup(name);
+          if (!option->name)
+            {
+              free(option);
+
+              break;
+            }
+
+          option->value = strdup(value);
+          if (!option->value)
+            {
+              free(option->name);
+              free(option);
+
+              break;
+            }
+
+          option->next = NULL;
+
+          if (!handler->options)
+            handler->options = option;
+
+          ret = 0;
+
+          break;
+        }
+
+      if (strcmp(option->name, name) == 0)
+        {
+          if (option->value)
+            free(option->value);
+
+          option->value = strdup(value);
+
+          ret = 0;
+
+          break;
+        }
+    }
+  while ((option = option->next));
+
+  return ret;
+}
+
+int
+log_handler_is_option_enabled(handler_t *handler, const char *name)
+{
+  char *value;
+
+  value = log_handler_get_option(handler, name);
+  if (!value)
+    return -1;
+
+  if ((strcasecmp(value, "yes") == 0) || (strcasecmp(value, "on") == 0)
+      || (strcasecmp(value, "1") == 0))
+    return 1;
+
+  return 0;
+}
+
+int
+log_handler_is_option_disabled(handler_t *handler, const char *name)
+{
+  char *value;
+
+  value = log_handler_get_option(handler, name);
+  if (!value)
+    return -1;
+
+  if ((strcasecmp(value, "no") == 0) || (strcasecmp(value, "off") == 0)
+      || (strcasecmp(value, "0") == 0))
+    return 1;
+
+  return 0;
+}
+
+void
+_log_handler_free_options(handler_t *handler)
+{
+  handler_option_t *option, *next;
+
+  option = handler->options;
+
+  while (option)
+    {
+      next = option->next;
+
+      free(option->name);
+      free(option->value);
+      free(option);
+
+      option = next;
+    }
+
+  handler->options = NULL;
+}
+
 logger_t *
 log_create_logger(handler_t *handler, LoggerLevel level)
 {
@@ -119,8 +278,9 @@ log_destroy_logger(logger_t *logger)
     }
     }
 
+  log_handler_destroy(logger->handler);
+
   free(logger);
-  logger = NULL;
 }
 
 LogLevel
@@ -256,138 +416,4 @@ log_message(logger_t *logger, LogLevel level, const char *format, ...)
     }
 
   free(message);
-}
-
-char *
-log_handler_get_option(handler_t *handler, const char *name)
-{
-  handler_option_t *option = NULL;
-  char *value = NULL;
-
-  for (option = handler->options; option; option = option->next)
-    {
-      if (strcmp(option->name, name) == 0)
-        {
-          value = option->value;
-
-          break;
-        }
-    }
-
-  return value;
-}
-
-int
-log_handler_set_option(handler_t *handler, const char *name, const char *value)
-{
-  handler_option_t *option;
-  int ret = -1;
-
-  option = handler->options;
-
-  do
-    {
-      if (!option)
-        {
-          option = malloc(sizeof(handler_option_t));
-          if (!option)
-            break;
-
-          memset(option, 0, sizeof (handler_option_t));
-
-          option->name = strdup(name);
-          if (!option->name)
-            {
-              free(option);
-
-              break;
-            }
-
-          option->value = strdup(value);
-          if (!option->value)
-            {
-              free(option->name);
-              free(option);
-
-              break;
-            }
-
-          option->next = NULL;
-
-          if (!handler->options)
-            handler->options = option;
-
-          ret = 0;
-
-          break;
-        }
-
-      if (strcmp(option->name, name) == 0)
-        {
-          if (option->value)
-            free(option->value);
-
-          option->value = strdup(value);
-
-          ret = 0;
-
-          break;
-        }
-    }
-  while ((option = option->next));
-
-  return ret;
-}
-
-int
-log_handler_is_option_enabled(handler_t *handler, const char *name)
-{
-  char *value;
-
-  value = log_handler_get_option(handler, name);
-  if (!value)
-    return -1;
-
-  if ((strcasecmp(value, "yes") == 0) || (strcasecmp(value, "on") == 0)
-      || (strcasecmp(value, "1") == 0))
-    return 1;
-
-  return 0;
-}
-
-int
-log_handler_is_option_disabled(handler_t *handler, const char *name)
-{
-  char *value;
-
-  value = log_handler_get_option(handler, name);
-  if (!value)
-    return -1;
-
-  if ((strcasecmp(value, "no") == 0) || (strcasecmp(value, "off") == 0)
-      || (strcasecmp(value, "0") == 0))
-    return 1;
-
-  return 0;
-}
-
-void
-_log_handler_free_options(handler_t *handler)
-{
-  handler_option_t *option, *next;
-
-  option = handler->options;
-
-  while (option)
-    {
-      next = option->next;
-
-      free(option->name);
-      free(option->value);
-      free(option);
-
-      option = next;
-    }
-
-  handler->options = NULL;
 }

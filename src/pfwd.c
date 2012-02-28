@@ -154,11 +154,14 @@ load_config()
 
   app->settings = g_key_file_new();
 
-  if (!g_key_file_load_from_file(app->settings, app->config_file,
-      G_KEY_FILE_NONE, &error))
+  g_key_file_load_from_file(app->settings, app->config_file, G_KEY_FILE_NONE,
+      &error);
+  if (error)
     {
       g_printerr("%s: %s (%s)\n", app->config_file, N_("error in config file"),
           error->message);
+
+      g_error_free(error);
 
       return FALSE;
     }
@@ -200,7 +203,7 @@ reload_config()
   if (!g_key_file_load_from_file(settings, app->config_file, G_KEY_FILE_NONE,
       &error))
     {
-      LOG_ERROR( "%s: %s (%s)\n",
+      LOG_ERROR("%s: %s (%s)\n",
           app->config_file, N_("error in config file, aborting reload"), error->message);
 
       g_key_file_free(settings);
@@ -223,7 +226,7 @@ reload_config()
 
   if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
     {
-      LOG_ERROR( "%s: %s (%s)\n",
+      LOG_ERROR("%s: %s (%s)\n",
           app->config_file, N_("error in config file"), N_("the first group is not 'main'"));
 
       g_free(group);
@@ -248,6 +251,7 @@ init_pfwds()
   GSList *list = NULL;
   GRegex *regex_ipv6, *regex_ipv4, *regex_unix;
   GMatchInfo *match_info;
+  GError *error = NULL;
   gchar **groups;
   gsize len;
   gint i;
@@ -284,10 +288,11 @@ init_pfwds()
       pfw->name = g_strdup(groups[i]);
 
       value = g_key_file_get_string(app->settings, pfw->name,
-          CONFIG_KEY_PFW_LISTEN, NULL);
-      if (!value)
+          CONFIG_KEY_PFW_LISTEN, &error);
+      if (error)
         {
           g_printerr("%s: %s\n", pfw->name, N_("invalid listen address"));
+          g_error_free(error);
 
           g_free(pfw);
           g_regex_unref(regex_unix);
@@ -423,10 +428,15 @@ init_pfwds()
       if (pfw->listen_af != AF_UNIX)
         {
           pfw->listen_port = g_key_file_get_integer(app->settings, pfw->name,
-              CONFIG_KEY_PFW_LISTENPORT, NULL);
-          if (pfw->listen_port == 0)
+              CONFIG_KEY_PFW_LISTENPORT, &error);
+          if (error || (pfw->listen_port <= 0))
             {
               g_printerr("%s: %s\n", pfw->name, N_("invalid listen port"));
+
+              if (error)
+                {
+                  g_error_free(error);
+                }
 
               g_free(pfw->listen);
               g_free(pfw);
@@ -439,23 +449,37 @@ init_pfwds()
             }
         }
 
-      pfw->listen_backlog = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_LISTENBACKLOG, NULL);
-      if (pfw->listen_backlog <= 0)
-        pfw->listen_backlog = CONFIG_KEY_PFW_LISTENBACKLOG_DEFAULT;
+      if (pfw->listen_af != AF_UNIX)
+        {
+          pfw->listen_backlog = g_key_file_get_integer(app->settings, pfw->name,
+              CONFIG_KEY_PFW_LISTENBACKLOG, &error);
+          if (error || (pfw->listen_backlog <= 0))
+            {
+              g_printerr("%s: %s\n", pfw->name, N_("invalid listen backlog"));
+
+              if (error)
+                {
+                  g_error_free(error);
+                }
+
+              return NULL;
+            }
+        }
 
       value = g_key_file_get_string(app->settings, pfw->name,
-          CONFIG_KEY_PFW_FORWARD, NULL);
-      if (!value)
+          CONFIG_KEY_PFW_FORWARD, &error);
+      if (error)
         {
           g_printerr("%s: %s\n", pfw->name, N_("invalid forward address"));
 
+          g_error_free(error);
           g_free(pfw->listen);
           g_free(pfw);
           g_strfreev(groups);
           g_regex_unref(regex_unix);
           g_regex_unref(regex_ipv4);
           g_regex_unref(regex_ipv6);
+
 
           return NULL;
         }
@@ -591,10 +615,15 @@ init_pfwds()
       if (pfw->forward_af != AF_UNIX)
         {
           pfw->forward_port = g_key_file_get_integer(app->settings, pfw->name,
-              CONFIG_KEY_PFW_FORWARDPORT, NULL);
-          if (pfw->forward_port == 0)
+              CONFIG_KEY_PFW_FORWARDPORT, &error);
+          if (error || (pfw->forward_port <= 0))
             {
               g_printerr("%s: %s\n", pfw->name, N_("invalid forward port"));
+
+              if (error)
+                {
+                  g_error_free(error);
+                }
 
               g_free(pfw->forward);
               g_free(pfw->listen);
@@ -609,15 +638,36 @@ init_pfwds()
         }
 
       pfw->buffer_size = g_key_file_get_integer(app->settings, pfw->name,
-          CONFIG_KEY_PFW_BUFFERSIZE, NULL);
-      if (pfw->buffer_size < 4096)
-        pfw->buffer_size = CONFIG_KEY_PFW_BUFFERSIZE_DEFAULT;
+          CONFIG_KEY_PFW_BUFFERSIZE, &error);
+      if (error || (pfw->buffer_size < CONFIG_KEY_PFW_BUFFERSIZE_MINIMUM))
+        {
+          pfw->buffer_size = CONFIG_KEY_PFW_BUFFERSIZE_DEFAULT;
+
+          g_printerr("%s: %s\n", pfw->name,
+              N_("setting socket buffer size to minimal value"));
+
+          if (error)
+            {
+              g_error_free(error);
+              error = NULL;
+            }
+        }
 
       pfw->allow_ips = g_key_file_get_string_list(app->settings, pfw->name,
-          CONFIG_KEY_PFW_ALLOW, NULL, NULL);
+          CONFIG_KEY_PFW_ALLOW, NULL, &error);
+      if (error)
+        {
+          g_error_free(error);
+          error = NULL;
+        }
 
       pfw->deny_ips = g_key_file_get_string_list(app->settings, pfw->name,
           CONFIG_KEY_PFW_DENY, NULL, NULL);
+      if (error)
+        {
+          g_error_free(error);
+          error = NULL;
+        }
 
       list = g_slist_append(list, pfw);
     }
@@ -640,8 +690,12 @@ init_logger()
   daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
       CONFIG_KEY_MAIN_DAEMONIZE, &error);
   if (error)
-    daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
+    {
+      daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
 
+      g_error_free(error);
+      error = NULL;
+    }
   if (daemon)
     {
       gboolean use_syslog;
@@ -651,12 +705,22 @@ init_logger()
       use_syslog = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
           CONFIG_KEY_MAIN_USESYSLOG, &error);
       if (error)
-        use_syslog = CONFIG_KEY_MAIN_USESYSLOG_DEFAULT;
+        {
+          use_syslog = CONFIG_KEY_MAIN_USESYSLOG_DEFAULT;
+
+          g_error_free(error);
+          error = NULL;
+        }
 
       log_level = g_key_file_get_integer(app->settings, CONFIG_GROUP_MAIN,
           CONFIG_KEY_MAIN_LOGLEVEL, &error);
       if (error)
-        log_level = CONFIG_KEY_MAIN_LOGLEVEL_DEFAULT;
+        {
+          log_level = CONFIG_KEY_MAIN_LOGLEVEL_DEFAULT;
+
+          g_error_free(error);
+          error = NULL;
+        }
 
       switch (log_level)
         {
@@ -688,37 +752,84 @@ init_logger()
           syslog_facility = g_key_file_get_string(app->settings,
               CONFIG_KEY_MAIN_GROUP, CONFIG_KEY_MAIN_SYSLOGFACILITY, &error);
           if (error)
-            syslog_facility = g_strdup(CONFIG_KEY_MAIN_SYSLOGFACILITY);
+            {
+              syslog_facility = g_strdup(CONFIG_KEY_MAIN_SYSLOGFACILITY);
 
-          handler_t *handler = log_handler_syslog_create();
+              g_error_free(error);
+            }
+
+          handler_t *handler = log_handler_create(LOG_HANDLER_TYPE_SYSLOG);
           if (!handler)
-            return NULL;
-          log_handler_set_option(handler, LOG_HANDLER_SYSLOG_OPTION_FACILITY,
-              syslog_facility);
+            {
+              g_free(syslog_facility);
+
+              return NULL;
+            }
+
+          if (!log_handler_set_option(handler,
+              LOG_HANDLER_SYSLOG_OPTION_FACILITY, syslog_facility))
+            {
+              log_handler_destroy(handler);
+              g_free(syslog_facility);
+
+              return NULL;
+            }
+
+          g_free(syslog_facility);
 
           logger = log_create_logger(handler, level);
+          if (!logger)
+            {
+              log_handler_destroy(handler);
+
+              return NULL;
+            }
         }
       else
         {
           gchar *log_file;
 
           log_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-              CONFIG_KEY_MAIN_LOGFILE, NULL);
-          if (!log_file)
-            log_file = g_strdup(CONFIG_KEY_MAIN_LOGFILE_DEFAULT);
+              CONFIG_KEY_MAIN_LOGFILE, &error);
+          if (error)
+            {
+              log_file = g_strdup(CONFIG_KEY_MAIN_LOGFILE_DEFAULT);
 
-          handler_t *handler = log_handler_file_create();
+              g_error_free(error);
+              error = NULL;
+            }
+
+          handler_t *handler = log_handler_create(LOG_HANDLER_TYPE_FILE);
           if (!handler)
-            return NULL;
-          log_handler_set_option(handler, LOG_HANDLER_FILE_OPTION_LOGFILE,
-              log_file);
+            {
+              g_free(log_file);
+
+              return NULL;
+            }
+
+          if (!log_handler_set_option(handler, LOG_HANDLER_FILE_OPTION_LOGFILE,
+              log_file))
+            {
+              log_handler_destroy(handler);
+              g_free(log_file);
+
+              return NULL;
+            }
+
+          g_free(log_file);
 
           logger = log_create_logger(handler, level);
+          if (!logger)
+            {
+              log_handler_destroy(handler);
+
+              return NULL;
+            }
         }
     }
   else
     {
-      handler_t *handler = log_handler_console_create();
+      handler_t *handler = log_handler_create(LOG_HANDLER_TYPE_CONSOLE);
       if (!handler)
         return NULL;
 
@@ -727,6 +838,12 @@ init_logger()
 #else
       logger = log_create_logger(handler, LOGGER_LEVEL_INFO);
 #endif
+      if (!logger)
+        {
+          log_handler_destroy(handler);
+
+          return NULL;
+        }
     }
 
   return logger;
@@ -965,11 +1082,13 @@ stop_pfwd(pfw_t *pfw)
       if (ev_is_active(pfw->w))
         {
           ev_io_stop(pfw->ev_loop, pfw->w);
+
+          LOG_DEBUG("%s: %s", pfw->name, N_("accept watcher stopped"));
         }
 
       g_free(pfw->w);
 
-      LOG_DEBUG("%s: %s", pfw->name, N_("accept watcher stopped"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("accept watcher cleaned"));
     }
 
   if (pfw->s_ws)
@@ -984,6 +1103,13 @@ stop_pfwd(pfw_t *pfw)
           if (!ev)
             continue;
 
+          if (ev_is_active(ev))
+            {
+              ev_io_stop(pfw->ev_loop, ev);
+
+              LOG_DEBUG("%s: %s", pfw->name, N_("server read watcher stopped"));
+            }
+
           if (ev->data)
             {
               pfw_io = (pfw_io_t *) ev->data;
@@ -992,6 +1118,8 @@ stop_pfwd(pfw_t *pfw)
                 {
                   g_free(pfw_io->buf);
                 }
+
+              g_free(pfw_io);
             }
 
           g_free(ev);
@@ -999,7 +1127,7 @@ stop_pfwd(pfw_t *pfw)
 
       g_slist_free(pfw->s_ws);
 
-      LOG_DEBUG("%s: %s", pfw->name, N_("server read watchers stopped"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("server read watchers cleaned"));
     }
 
   if (pfw->c_ws)
@@ -1017,6 +1145,8 @@ stop_pfwd(pfw_t *pfw)
           if (ev_is_active(ev))
             {
               ev_io_stop(pfw->ev_loop, ev);
+
+              LOG_DEBUG("%s: %s", pfw->name, N_("client read watcher stopped"));
             }
 
           if (ev->data)
@@ -1028,6 +1158,8 @@ stop_pfwd(pfw_t *pfw)
 
               if (pfw_io->buf)
                 g_free(pfw_io->buf);
+
+              g_free(pfw_io);
             }
 
           g_free(ev);
@@ -1035,7 +1167,7 @@ stop_pfwd(pfw_t *pfw)
 
       g_slist_free(pfw->c_ws);
 
-      LOG_DEBUG("%s: %s", pfw->name, N_("client read watchers stopped"));
+      LOG_DEBUG("%s: %s", pfw->name, N_("client read watchers cleaned"));
     }
 
   if (pfw->fd)
@@ -1043,7 +1175,11 @@ stop_pfwd(pfw_t *pfw)
       close(pfw->fd);
 
       if (pfw->listen_af == AF_UNIX)
-        unlink(pfw->listen);
+        {
+          unlink(pfw->listen);
+
+          LOG_DEBUG("%s: %s", pfw->name, N_("UNIX socket file deleted"));
+        }
 
       if (pfw->listen_af == AF_INET6)
         {
@@ -1615,7 +1751,6 @@ parse_command_line(gint argc, gchar *argv[])
   gboolean verbose = FALSE;
   gint show_version = 0;
   GError *error = NULL;
-  gboolean ret;
 
   GOptionEntry entries[] =
     {
@@ -1630,21 +1765,20 @@ parse_command_line(gint argc, gchar *argv[])
   context = g_option_context_new(NULL);
   g_option_context_add_main_entries(context, entries, PACKAGE);
 
-  ret = g_option_context_parse(context, &argc, &argv, &error);
-
-  help = g_option_context_get_help(context, TRUE, NULL);
-
-  g_option_context_free(context);
-
-  if (!ret)
+  g_option_context_parse(context, &argc, &argv, &error);
+  if (error)
     {
+      help = g_option_context_get_help(context, TRUE, NULL);
+      g_option_context_free(context);
       g_print("%s", help);
 
+      g_error_free(error);
       g_free(help);
+
       exit(1);
     }
 
-  g_free(help);
+  g_option_context_free(context);
 
   if (show_version == 1)
     {
@@ -1705,25 +1839,37 @@ cleanup(void)
       daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
           CONFIG_KEY_MAIN_DAEMONIZE, &error);
       if (error)
-        daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
+        {
+          daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
+
+          g_error_free(error);
+          error = NULL;
+        }
       if (daemon)
         {
           gchar *pid_file;
 
           pid_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-              CONFIG_KEY_MAIN_PIDFILE, NULL);
-          if (pid_file)
+              CONFIG_KEY_MAIN_PIDFILE, &error);
+          if (error)
             {
-              g_unlink(pid_file);
-              g_free(pid_file);
+              pid_file = g_strdup(CONFIG_KEY_MAIN_PIDFILE_DEFAULT);
+
+              g_error_free(error);
+              error = NULL;
             }
+
+          g_unlink(pid_file);
+          g_free(pid_file);
         }
 
       LOG_INFO("%s %s", PACKAGE, N_("daemon stopped"));
     }
 
   if (app->logger)
-    log_destroy_logger(app->logger);
+    {
+      log_destroy_logger(app->logger);
+    }
 
   if (app->pfwds)
     {
@@ -1788,25 +1934,45 @@ main(gint argc, gchar *argv[])
   daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
       CONFIG_KEY_MAIN_DAEMONIZE, &error);
   if (error)
-    daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
+    {
+      daemon = CONFIG_KEY_MAIN_DAEMONIZE_DEFAULT;
+
+      g_error_free(error);
+      error = NULL;
+    }
   if (daemon)
     {
       gchar *pid_file, *user, *group;
 
       pid_file = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_PIDFILE, NULL);
-      if (!pid_file)
-        pid_file = g_strdup(CONFIG_KEY_MAIN_PIDFILE_DEFAULT);
+          CONFIG_KEY_MAIN_PIDFILE, &error);
+      if (error)
+        {
+          pid_file = g_strdup(CONFIG_KEY_MAIN_PIDFILE_DEFAULT);
+
+          g_error_free(error);
+          error = NULL;
+        }
 
       user = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_USER, NULL);
-      if (!user)
-        user = g_strdup(CONFIG_KEY_MAIN_USER_DEFAULT);
+          CONFIG_KEY_MAIN_USER, &error);
+      if (error)
+        {
+          user = g_strdup(CONFIG_KEY_MAIN_USER_DEFAULT);
+
+          g_error_free(error);
+          error = NULL;
+        }
 
       group = g_key_file_get_string(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_GROUP, NULL);
-      if (!group)
-        group = g_strdup(CONFIG_KEY_MAIN_GROUP_DEFAULT);
+          CONFIG_KEY_MAIN_GROUP, &error);
+      if (error)
+        {
+          group = g_strdup(CONFIG_KEY_MAIN_GROUP_DEFAULT);
+
+          g_error_free(error);
+          error = NULL;
+        }
 
       ret = daemonize(pid_file, user, group);
 

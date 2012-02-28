@@ -43,8 +43,6 @@ typedef enum
   LOG_SYSLOG_FACILITY_LOCAL7,
 } LogSyslogFacility;
 
-handler_t *
-log_handler_syslog_create();
 void
 _log_handler_syslog_init(handler_t *handler);
 void

@@ -23,15 +23,6 @@
 
 typedef enum
 {
-  LOGGER_HANDLER_NONE = 1,
-  LOGGER_HANDLER_CONSOLE = 1 << 1,
-  LOGGER_HANDLER_FILE = 1 << 2,
-  LOGGER_HANDLER_SYSLOG = 1 << 3,
-  LOGGER_HANDLER_ALL = 2
-} LoggerHandler;
-
-typedef enum
-{
   LOGGER_LEVEL_NONE = 0,
   LOGGER_LEVEL_EMERGENCY = 10,
   LOGGER_LEVEL_ALERT = 20,
@@ -79,6 +70,19 @@ typedef struct _logger_t
   LoggerLevel level;
 } logger_t;
 
+
+handler_t *
+log_handler_create();
+void
+log_handler_destroy(handler_t *handler);
+char *
+log_handler_get_option(handler_t *handler, const char *name);
+int
+log_handler_set_option(handler_t *handler, const char *name, const char *value);
+int
+log_handler_is_option_enabled(handler_t *handler, const char *name);
+int
+log_handler_is_option_disabled(handler_t *handler, const char *name);
 logger_t *
 log_create_logger(handler_t *handler, LoggerLevel level);
 void
@@ -89,15 +93,5 @@ const char *
 log_get_level_name(LogLevel level);
 void
 log_message(logger_t *logger, LogLevel level, const char *format, ...);
-char *
-log_handler_get_option(handler_t *handler, const char *name);
-int
-log_handler_set_option(handler_t *handler, const char *name, const char *value);
-int
-log_handler_is_option_enabled(handler_t *handler, const char *name);
-int
-log_handler_is_option_disabled(handler_t *handler, const char *name);
-void
-_log_handler_free_options(handler_t *handler);
 
 #endif /* LOG_H_ */

@@ -30,21 +30,6 @@
 #include <string.h>
 #include <time.h>
 
-handler_t *
-log_handler_console_create()
-{
-  handler_t *handler = malloc (sizeof(handler_t));
-  if (!handler)
-    return NULL;
-
-  memset (handler, 0, sizeof(handler_t));
-
-  handler->type = LOG_HANDLER_TYPE_CONSOLE;
-  handler->options = NULL;
-
-  return handler;
-}
-
 void
 _log_handler_console_init(handler_t *handler)
 {
@@ -53,8 +38,6 @@ _log_handler_console_init(handler_t *handler)
 void
 _log_handler_console_cleanup(handler_t *handler)
 {
-  _log_handler_free_options(handler);
-  free(handler);
 }
 
 void

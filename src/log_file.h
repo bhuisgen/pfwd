@@ -23,8 +23,6 @@
 
 #define LOG_HANDLER_FILE_OPTION_LOGFILE                 "FileHandler.LogFile"
 
-handler_t *
-log_handler_file_create();
 void
 _log_handler_file_init(handler_t *handler);
 void
