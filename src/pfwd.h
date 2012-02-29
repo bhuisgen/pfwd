@@ -38,9 +38,7 @@
 #define CONFIG_KEY_MAIN_PIDFILE                 "PIDFile"
 #define CONFIG_KEY_MAIN_PIDFILE_DEFAULT         "/var/run/" PACKAGE "/" PACKAGE ".pid"
 #define CONFIG_KEY_MAIN_USER                    "User"
-#define CONFIG_KEY_MAIN_USER_DEFAULT            "root"
 #define CONFIG_KEY_MAIN_GROUP                   "Group"
-#define CONFIG_KEY_MAIN_GROUP_DEFAULT           "root"
 #define CONFIG_KEY_MAIN_LOGLEVEL                "LogLevel"
 #define CONFIG_KEY_MAIN_LOGLEVEL_NONE            0
 #define CONFIG_KEY_MAIN_LOGLEVEL_ERROR           1
@@ -60,6 +58,9 @@
 #define CONFIG_KEY_PFW_LISTENPORT               "ListenPort"
 #define CONFIG_KEY_PFW_LISTENBACKLOG            "ListenBacklog"
 #define CONFIG_KEY_PFW_LISTENBACKLOG_DEFAULT    100
+#define CONFIG_KEY_PFW_LISTENOWNER              "ListenOwner"
+#define CONFIG_KEY_PFW_LISTENGROUP              "ListenGroup"
+#define CONFIG_KEY_PWD_LISTENMODE               "ListenMode"
 #define CONFIG_KEY_PFW_FORWARD                  "Forward"
 #define CONFIG_KEY_PFW_FORWARDPORT              "ForwardPort"
 #define CONFIG_KEY_PFW_BUFFERSIZE               "BufferSize"
