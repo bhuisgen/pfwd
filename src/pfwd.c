@@ -134,7 +134,7 @@ get_default_config_file(const gchar *file)
   const gchar *homedir;
   gchar* config_file;
 
-  if (file && !g_access(file, W_OK))
+  if (file && !g_access(file, R_OK))
     {
       config_file = g_strdup(file);
 
@@ -809,9 +809,9 @@ init_pfwds()
 logger_t *
 init_logger()
 {
+  GError *error = NULL;
   logger_t *logger = NULL;
   gboolean daemon;
-  GError *error = NULL;
 
   daemon = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
       CONFIG_KEY_MAIN_DAEMONIZE, &error);
@@ -1916,11 +1916,11 @@ void
 parse_command_line(gint argc, gchar *argv[])
 {
   GOptionContext *context;
+  GError *error = NULL;
   gchar *help;
   gchar *config_file = NULL;
   gboolean verbose = FALSE;
   gint show_version = 0;
-  GError *error = NULL;
 
   GOptionEntry entries[] =
     {
@@ -1963,7 +1963,7 @@ parse_command_line(gint argc, gchar *argv[])
   if (!app->config_file)
     {
       g_printerr("%s\n",
-          N_("The configuration file doesn't exist or cannot be readed."));
+          N_("The configuration file doesn't exist or cannot be read."));
 
       exit(1);
     }
@@ -2004,8 +2004,8 @@ sigterm(gint sig)
 void
 cleanup(void)
 {
-  gboolean daemon;
   GError *error = NULL;
+  gboolean daemon;
 
   if (app->logger)
     LOG_DEBUG("%s", N_("cleanup"));
@@ -2081,9 +2081,9 @@ cleanup(void)
 gint
 main(gint argc, gchar *argv[])
 {
+  GError *error = NULL;
   gboolean daemon;
   gint ret;
-  GError *error = NULL;
 
   setlocale(LC_ALL, "");
   bindtextdomain(PACKAGE, LOCALEDIR);

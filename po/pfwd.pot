@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pfwd 0.1\n"
 "Report-Msgid-Bugs-To: bhuisgen@hbis.fr\n"
-"POT-Creation-Date: 2012-02-29 19:42+0100\n"
+"POT-Creation-Date: 2012-02-29 22:20+0100\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -395,7 +395,7 @@ msgid "show version information"
 msgstr ""
 
 #: src/pfwd.c:1966
-msgid "The configuration file doesn't exist or cannot be readed."
+msgid "The configuration file doesn't exist or cannot be read."
 msgstr ""
 
 #: src/pfwd.c:1977
