@@ -99,7 +99,7 @@ GSList *
 init_pfwds();
 logger_t *
 init_logger();
-gboolean
+static gboolean
 run_main_loop();
 static void
 exit_main_loop(void);
@@ -111,7 +111,7 @@ static void
 pfwd_accept_event(EV_P_ ev_io *w, gint revents);
 static void
 pfwd_read_event(EV_P_ ev_io *w, gint revents);
-gboolean
+static gboolean
 pfwd_check_access(pfw_t *pfw, gchar *ip);
 void
 version();
@@ -976,7 +976,7 @@ init_logger()
   return logger;
 }
 
-gboolean
+static gboolean
 run_main_loop()
 {
   struct ev_loop *loop;
@@ -1000,7 +1000,9 @@ run_main_loop()
       pfw = (pfw_t *) item->data;
 
       if (!start_pfwd(pfw))
-        continue;
+        {
+          return FALSE;
+        }
     }
 
   ev_loop(loop, 0);
@@ -1853,7 +1855,7 @@ pfwd_read_event(EV_P_ ev_io *w, gint revents)
       }
   }
 
-gboolean
+static gboolean
 pfwd_check_access(pfw_t *pfw, gchar *ip)
 {
   gboolean deny = FALSE;
