@@ -1,9 +1,146 @@
-2012-02-28 Boris HUISGEN <bhuisgen@hbis.fr>
+commit b7c139a33c26a46f270d23ac03624087992b9d74
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Sun Mar 18 02:24:40 2012 +0100
 
-	* pfwd.c: allow forwarding independently of the socket type.
-	* pfwd.c: add UNIX socket support.
-	* pfwd.c: add allow/deny rules support.
+    Add forwarder support in command line execution.
+    
+    - pfwd.c: add forwarder support in client execution.
+    - pfwd.c: fix SIGHUP to work only in daemon mode.
+    - pfwd.c: disable configuration file loading in client execution.
+    - pfwd.c: force custom config file to be absolute for daemon mode.
+    - pfwd.c: add listen/forward address format errors detection.
+    - pfwd.c: add uid/gid support for listen owner/group options.
+    - pfwd.c: update logger macros to check logger existence.
+    - pfwd.c: remove unused variables.
+    - pfwd.c: fix memory leaks in init_pfwds().
+    - pfwd.c: fix verbose output in init_logger().
+    - pfwd.c: fix logger_set_options() return values.
+    - pfwd.c: fix help text output.
+    - daemon.c: remove unused variable.
+    - configure.in: update file.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
 
-2011-04-16 Boris HUISGEN <bhuisgen@hbis.fr>
+commit 925eca3fb1c9037289877dd534acc818bbdf7f17
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Fri Mar 2 23:22:14 2012 +0100
 
-	* [RELEASE] version 0.1
+    Abort execution if one redirector cannot be started.
+    
+    - pfwd.c: abort execution if one redirector can be started.
+    - pfwd.c: fix static functions.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
+
+commit 6bd7518937230bb1e58eb936d5b827f5bb218508
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Wed Feb 29 23:40:22 2012 +0100
+
+    Fix read flag check of user config file.
+    
+    - pfwd.c: fix read flag check of user config file.
+    - pfwd.c: some cosmetics fixes.
+    - README: fix URL.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
+
+commit e722cd0530968e5a39379cebbb2460b7b94b0071
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Wed Feb 29 19:45:35 2012 +0100
+
+    Add security options for unix sockets.
+    
+    - pfwd.c: add listen owner / group / mode options support to secure
+    UNIX sockets.
+    - pfwd.c: fix to allow daemon execution without setting user and group
+    options.
+    - pfwd.c: fix defaults values for listen backlog.
+    - pfwd.c: fix for custom config file and add file check before options
+    loading.
+    - pfwd.c: fix GError by setting all pointers to NULL after freeing
+    memory.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
+
+commit a77ed2daa1e32f358a1108a1eb4df1dbe70ccead
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Tue Feb 28 20:47:51 2012 +0100
+
+    Fix memory leaks and add extra checks.
+    
+    - pfwd.h: default backlog value to 100.
+    - pfwd.c: force minimum socket buffer size to 1024 bytes.
+    - pfwd.c: return error with invalid listen backlog value.
+    - pfwd.c: use GError on all glib functions where it is possible.
+    - pfwd.c: fix to disable listen port / forward port checks with AF_UNIX
+    sockets.
+    - pfwd.c: fix stop_pfwd() to stop all watchers.
+    - pfwd.c: update logger/handlers with new API and fix handler memory
+    leak.
+    - log.c: redesign log handler functions.
+    - log_console.c: update API.
+    - log_file.c: update API.
+    - log_syslog.c: update API.
+
+commit d7bd8bf587093a43fc50ce31319fee366ecb6842
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Tue Feb 28 00:33:32 2012 +0100
+
+    Add unix socket support.
+    
+    - pfwd.c: allow forwarding independently of the socket type.
+    - pfwd.c: add UNIX socket support.
+    - pfwd.c: externalize functions to start/stop port forwarders.
+    - pfwd.c: add watchers lists for cleaning memory.
+    - pfwd.c: fix memory leaks in settings loading.
+    - log_console.c: fix one memory leak.
+    - log_file.c: fix one memory leak.
+    - log_syslog.c: fix one memory leak.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
+
+commit 214917e829f7e017d6419521805523ae2d9f91e9
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Sun Feb 26 18:21:40 2012 +0100
+
+    Some fixes.
+    
+    - common.h: remove gio.h header.
+    - daemon.c: fix user/group swap.
+    - daemon.c: remove lock file and use O_EXCL on the PID file.
+    - log.c: add stdarg.h header.
+    - pfwd.c: remove logger argument for LOG_ macros.
+    - pfwd.c: add support to user configuration file.
+    - pfwd.c: check main/redirection groups existence and creation order.
+    - pfwd.c: fix daemon exec by adding a daemon flag to known current
+    execution type.
+    - pfwd.c: fix daemonize by removing lock_file.
+    - Makefile.am: fix datadir/docdir/localdir.
+    - configure.in: add VERSION support.
+    - configure.in: fix datadir/docdir/localdir.
+    - Makefile.am: fix datadir/docdir/localdir.
+    - add init.d scripts.
+    - add autogen.sh script.
+    
+    Signed-off-by: Boris HUISGEN <bhuisgen@hbis.fr>
+
+commit eead157fa925140a460df52e2260ad6fa3105337
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Wed Feb 22 01:13:54 2012 +0100
+
+    Add allow/deny rules support.
+    
+    - pfwd.c: add allow/deny rules support.
+    - pfwd.c: fix close sockets on error.
+
+commit 6027fc8a212e26033c4116facd765c923e439c15
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Tue Feb 21 01:14:17 2012 +0100
+
+    Remove unused variable.
+
+commit 1271784c6246a212f5f810432a946aafd8d68aee
+Author: Boris HUISGEN <bhuisgen@hbis.fr>
+Date:   Tue Feb 21 00:51:16 2012 +0100
+
+    release 0.1

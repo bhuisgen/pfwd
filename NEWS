@@ -1,4 +1,9 @@
 NEWS
 
+[0.2]
+	- listen/forward to unix sockets.
+	- add allow/deny rules.
+	- allow command line execution.
+
 [0.1]
 	- first version.
