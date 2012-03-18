@@ -1,5 +1,5 @@
 /*
- * pfwd - a port forwarding server
+ * pfwd - a port forwarding tool
  *
  * Copyright 2011 Boris HUISGEN <bhuisgen@hbis.fr>
  *
@@ -54,6 +54,8 @@
 #define CONFIG_KEY_MAIN_USESYSLOG_DEFAULT        CONFIG_KEY_MAIN_USESYSLOG_NO
 #define CONFIG_KEY_MAIN_SYSLOGFACILITY          "SyslogFacility"
 #define CONFIG_KEY_MAIN_SYSLOGFACILITY_DEFAULT  "DAEMON";
+
+#define CONFIG_GROUP_PFW                        "forwarder"
 #define CONFIG_KEY_PFW_LISTEN                   "Listen"
 #define CONFIG_KEY_PFW_LISTENPORT               "ListenPort"
 #define CONFIG_KEY_PFW_LISTENBACKLOG            "ListenBacklog"

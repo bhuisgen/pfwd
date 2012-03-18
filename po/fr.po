@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: pfwd 0.1\n"
 "Report-Msgid-Bugs-To: bhuisgen@hbis.fr\n"
-"POT-Creation-Date: 2012-03-02 23:19+0100\n"
+"POT-Creation-Date: 2012-03-18 02:24+0100\n"
 "PO-Revision-Date: 2011-04-16 12:12+0200\n"
 "Last-Translator: Boris HUISGEN <bhuisgen@hbis.fr>\n"
 "Language-Team: Français <fr@li.org>\n"
@@ -16,419 +16,522 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: src/pfwd.c:180 src/pfwd.c:194 src/pfwd.c:202 src/pfwd.c:244 src/pfwd.c:255
-#: src/pfwd.c:293
+#: src/pfwd.c:181 src/pfwd.c:195 src/pfwd.c:203 src/pfwd.c:244 src/pfwd.c:254
+#: src/pfwd.c:291
 msgid "error in configuration file"
 msgstr "erreur dans le fichier de configuration"
 
-#: src/pfwd.c:195 src/pfwd.c:245
+#: src/pfwd.c:195 src/pfwd.c:244
 msgid "no group 'main'"
 msgstr "aucun groupe 'main'"
 
-#: src/pfwd.c:203 src/pfwd.c:256
+#: src/pfwd.c:204 src/pfwd.c:254
 msgid "the first group is not 'main'"
 msgstr "le premier groupe n'est pas 'main'"
 
-#: src/pfwd.c:228
+#: src/pfwd.c:229
 msgid "error in configuration file, aborting reload"
 msgstr "erreur dans le fichier de configuration, rechargement ignoré"
 
-#: src/pfwd.c:294
-msgid "no redirector group"
-msgstr "aucun groupe de redirecteur trouvé"
+#: src/pfwd.c:291
+msgid "no forwarder group"
+msgstr "aucun groupe de redirection trouvé"
 
-#: src/pfwd.c:320
+#: src/pfwd.c:317
 msgid "invalid listen address"
 msgstr "adresse d'écoute invalide"
 
-#: src/pfwd.c:342 src/pfwd.c:359
+#: src/pfwd.c:339 src/pfwd.c:356
 msgid "invalid IPv6 listen address"
 msgstr "adresse IPv6 d'écoute non valide"
 
-#: src/pfwd.c:388 src/pfwd.c:407
+#: src/pfwd.c:385 src/pfwd.c:404
 msgid "invalid IPv4 listen address"
 msgstr "adresse IPv4 d'écoute non valide"
 
-#: src/pfwd.c:435
-msgid "invalid UNIX listen path"
-msgstr "adresse UNIX d'écoute non valide"
+#: src/pfwd.c:432
+msgid "invalid unix listen path"
+msgstr "adresse unix d'écoute non valide"
 
-#: src/pfwd.c:461
+#: src/pfwd.c:455
+msgid "invalid listen address format"
+msgstr "format d'adresse d'écoute invalide"
+
+#: src/pfwd.c:473
 msgid "invalid listen port"
 msgstr "port d'écoute non valide"
 
-#: src/pfwd.c:493
+#: src/pfwd.c:506
 msgid "invalid listen socket backlog"
 msgstr "taille de la file d'attente de connexions réseau non valide"
 
-#: src/pfwd.c:516
+#: src/pfwd.c:539
 msgid "listen socket owner cannot be changed"
 msgstr "le propriétaire de la socket d'écoute ne peut être modifié"
 
-#: src/pfwd.c:524
+#: src/pfwd.c:560 src/pfwd.c:577
 msgid "invalid listen socket owner"
 msgstr "propriétaire de la socket d'écoute non valide"
 
-#: src/pfwd.c:543
+#: src/pfwd.c:608
 msgid "listen socket group cannot be changed"
 msgstr "le groupe de la socket d'écoute ne peut être modifié"
 
-#: src/pfwd.c:551
+#: src/pfwd.c:630 src/pfwd.c:648
 msgid "invalid listen socket group"
 msgstr "groupe de la socket d'écoute non valide"
 
-#: src/pfwd.c:559
+#: src/pfwd.c:667
 msgid "listen socket group is not present"
 msgstr "le groupe de la socket d'écoute n'est pas spécifié"
 
-#: src/pfwd.c:566
+#: src/pfwd.c:684
 msgid "listen socket owner is not present"
 msgstr "le propriétaire de la socket d'écoute n'est pas spécifié"
 
-#: src/pfwd.c:584
+#: src/pfwd.c:712
 msgid "invalid listen socket mode"
 msgstr "mode de la socket d'écoute non valide"
 
-#: src/pfwd.c:597
+#: src/pfwd.c:734
 msgid "invalid forward address"
 msgstr "adresse de redirection non valide"
 
-#: src/pfwd.c:620 src/pfwd.c:638
+#: src/pfwd.c:760 src/pfwd.c:780
 msgid "invalid IPv6 forward address"
 msgstr "adresse IPv6 de redirection non valide"
 
-#: src/pfwd.c:668 src/pfwd.c:688
+#: src/pfwd.c:812 src/pfwd.c:834
 msgid "invalid IPv4 forward address"
 msgstr "adresse IPv4 de redirection non valide"
 
-#: src/pfwd.c:718
-msgid "invalid UNIX forward path"
-msgstr "adresse UNIX de redirection non valide"
+#: src/pfwd.c:866
+msgid "invalid unix forward path"
+msgstr "adresse unix de redirection non valide"
 
-#: src/pfwd.c:745
+#: src/pfwd.c:892
+msgid "invalid forward address format"
+msgstr "format d'adresse de redirection non valide"
+
+#: src/pfwd.c:913
 msgid "invalid forward port"
 msgstr "port de redirection non valide"
 
-#: src/pfwd.c:779
+#: src/pfwd.c:949
 msgid "setting socket buffer size to minimal value"
 msgstr "sélection de la taille minimale du buffer réseau"
 
-#: src/pfwd.c:986
+#: src/pfwd.c:1163
 msgid "running main loop"
 msgstr "exécution de la boucle principale"
 
-#: src/pfwd.c:991
+#: src/pfwd.c:1168
 msgid "failed to retrieve main loop"
 msgstr "échec de récupération de la boucle principale"
 
-#: src/pfwd.c:1019
+#: src/pfwd.c:1196
 msgid "exiting main loop"
 msgstr "arrêt de la boucle principale"
 
-#: src/pfwd.c:1062
+#: src/pfwd.c:1239
 msgid "failed to create local IPv6 socket"
 msgstr "échec de création de la socket IPv6 locale"
 
-#: src/pfwd.c:1075
+#: src/pfwd.c:1252
 msgid "failed to bind local IPv6 socket"
 msgstr "échec de liaison de la socket IPv6 locale"
 
-#: src/pfwd.c:1082
+#: src/pfwd.c:1259
 msgid "failed to listen on local IPv6 socket"
 msgstr "échec d'écoute de la socket IPv6 locale"
 
-#: src/pfwd.c:1108
+#: src/pfwd.c:1285
 msgid "failed to create local IPv4 socket"
 msgstr "échec de création de la socket IPv4 locale"
 
-#: src/pfwd.c:1121
+#: src/pfwd.c:1298
 msgid "failed to bind local IPv4 socket"
 msgstr "échec de liaison de la socket IPv4 locale"
 
-#: src/pfwd.c:1129
+#: src/pfwd.c:1306
 msgid "failed to listen on local IPv4 socket"
 msgstr "échec d'écoute de la socket IPv4 locale"
 
-#: src/pfwd.c:1150
-msgid "failed to create local UNIX socket"
-msgstr "échec de création de la socket UNIX locale"
+#: src/pfwd.c:1327
+msgid "failed to create local unix socket"
+msgstr "échec de création de la socket unix locale"
 
-#: src/pfwd.c:1159
-msgid "failed to bind local UNIX socket"
-msgstr "échec de liaison de la socket UNIX locale"
+#: src/pfwd.c:1336
+msgid "failed to bind local unix socket"
+msgstr "échec de liaison de la socket unix locale"
 
-#: src/pfwd.c:1167
-msgid "failed to listen on local UNIX socket"
-msgstr "échec d'écoute de la socket UNIX locale"
+#: src/pfwd.c:1344
+msgid "failed to listen on local unix socket"
+msgstr "échec d'écoute de la socket unix locale"
 
-#: src/pfwd.c:1184
-msgid "failed to get the UNIX socket UID"
-msgstr "échec de récupération de l'UID de la socket UNIX"
+#: src/pfwd.c:1364
+msgid "failed to retrieve the user name, trying the user id"
+msgstr ""
+"échec de récupération du nom de l'utilisateur, essai sur l'identifiant "
+"utilisateur"
 
-#: src/pfwd.c:1193
-msgid "failed to get the UNIX socket GID"
-msgstr "échec de récupération du GID de la socket UNIX"
+#: src/pfwd.c:1370 src/pfwd.c:1395
+msgid "invalid value"
+msgstr "valeur non valide"
 
-#: src/pfwd.c:1201
-msgid "failed to set the UNIX socket UID/GID"
-msgstr "échec de modification UID/GID de la socket UNIX"
+#: src/pfwd.c:1379
+msgid "failed to retrieve the local unix socket owner"
+msgstr "échec de récupération du propriétaire de la socket unix locale"
 
-#: src/pfwd.c:1212
-msgid "failed to set rights on local UNIX socket"
-msgstr "échec de modification des permissions sur la socket UNIX"
+#: src/pfwd.c:1389
+msgid "failed to retrieve the group name, trying the group id"
+msgstr ""
+"échec de récupération du nom du groupe, essai sur l'identifiant de groupe"
 
-#: src/pfwd.c:1222
+#: src/pfwd.c:1404
+msgid "failed to retrieve the local unix socket group"
+msgstr "échec de récupération du groupe de la socket unix locale"
+
+#: src/pfwd.c:1413
+msgid "failed to set the local unix socket owner/group"
+msgstr "échec d'affectation du propriétaire/groupe de la socket unix locale"
+
+#: src/pfwd.c:1424
+msgid "failed to set the local unix socket rights"
+msgstr "échec d'affectation des droits de la socket unix locale"
+
+#: src/pfwd.c:1434
 msgid "accept watcher created"
 msgstr "observateur d'acceptation créé"
 
-#: src/pfwd.c:1226
+#: src/pfwd.c:1438
 msgid "accept watcher started"
 msgstr "observateur d'acceptation démarré"
 
-#: src/pfwd.c:1231 src/pfwd.c:1236 src/pfwd.c:1241
+#: src/pfwd.c:1443 src/pfwd.c:1448 src/pfwd.c:1453
 msgid "socket is listening"
 msgstr "socket en écoute"
 
-#: src/pfwd.c:1258
+#: src/pfwd.c:1470
 msgid "accept watcher stopped"
 msgstr "observateur d'acceptation arrêté"
 
-#: src/pfwd.c:1263
+#: src/pfwd.c:1475
 msgid "accept watcher cleaned"
 msgstr "observateur d'acceptation nettoyé"
 
-#: src/pfwd.c:1282
+#: src/pfwd.c:1494
 msgid "server read watcher stopped"
 msgstr "observateurs de lecture serveur arrêté"
 
-#: src/pfwd.c:1302
+#: src/pfwd.c:1514
 msgid "server read watchers cleaned"
 msgstr "observateur de lecture serveur nettoyé"
 
-#: src/pfwd.c:1321
+#: src/pfwd.c:1533
 msgid "client read watcher stopped"
 msgstr "observateur de lecture clients arrêté"
 
-#: src/pfwd.c:1342
+#: src/pfwd.c:1554
 msgid "client read watchers cleaned"
 msgstr "observateurs de lecture client nettoyés"
 
-#: src/pfwd.c:1353
-msgid "UNIX socket file deleted"
-msgstr "fichier de socket UNIX supprimé"
+#: src/pfwd.c:1565
+msgid "unix socket file deleted"
+msgstr "fichier de socket unix supprimé"
 
-#: src/pfwd.c:1359 src/pfwd.c:1364 src/pfwd.c:1369
+#: src/pfwd.c:1571 src/pfwd.c:1576 src/pfwd.c:1581
 msgid "socket closed"
 msgstr "socket fermée"
 
-#: src/pfwd.c:1378
+#: src/pfwd.c:1590
 msgid "new accept event"
 msgstr "nouvel évènement d'acceptation"
 
-#: src/pfwd.c:1383
+#: src/pfwd.c:1595
 msgid "no data found, ignoring accept event"
 msgstr "pas de données trouvées, évènement d'acceptation ignoré"
 
-#: src/pfwd.c:1410
+#: src/pfwd.c:1622
 msgid "failed to accept new IPv6 client"
 msgstr "échec d'acceptation du nouveau client IPv6"
 
-#: src/pfwd.c:1418
+#: src/pfwd.c:1630
 msgid "failed to resolv IPv6 client address"
 msgstr "échec de résolution de l'adresse IPv6 du client"
 
-#: src/pfwd.c:1431
+#: src/pfwd.c:1643
 msgid "IPv6 client address denied"
 msgstr "adresse IPv6 client interdite"
 
-#: src/pfwd.c:1440
+#: src/pfwd.c:1652
 msgid "IPv6 client address allowed"
 msgstr "adresse IPv6 client autorisée"
 
-#: src/pfwd.c:1462
+#: src/pfwd.c:1674
 msgid "failed to accept new IPv4 client"
 msgstr "échec d'acceptation du nouveau client IPv4"
 
-#: src/pfwd.c:1470
+#: src/pfwd.c:1682
 msgid "failed to resolv IPv4 client address"
 msgstr "échec de résolution de l'adresse IPv4 du client"
 
-#: src/pfwd.c:1483
+#: src/pfwd.c:1695
 msgid "IPv4 client address denied"
 msgstr "adresse IPv4 client interdite"
 
-#: src/pfwd.c:1492
+#: src/pfwd.c:1704
 msgid "IPv4 client address allowed"
 msgstr "adresse IPv4 client autorisée"
 
-#: src/pfwd.c:1514
-msgid "failed to accept new UNIX client"
-msgstr "échec d'acceptation du nouveau client UNIX"
+#: src/pfwd.c:1726
+msgid "failed to accept new unix client"
+msgstr "échec d'acceptation du nouveau client unix"
 
-#: src/pfwd.c:1534
+#: src/pfwd.c:1746
 msgid "failed to create remote IPv6 socket"
 msgstr "échec de création de la socket IPv6 distante"
 
-#: src/pfwd.c:1548
+#: src/pfwd.c:1760
 msgid "failed to bind remote IPv6 socket"
 msgstr "échec de liaison de la socket IPv6 distante"
 
-#: src/pfwd.c:1570
+#: src/pfwd.c:1782
 msgid "failed to connect remote IPv6 socket"
 msgstr "échec de connexion de la socket IPv6 distante"
 
-#: src/pfwd.c:1592
+#: src/pfwd.c:1804
 msgid "failed to create remote IPv4 socket"
 msgstr "échec de création de la socket IPv6 distante"
 
-#: src/pfwd.c:1606
+#: src/pfwd.c:1818
 msgid "failed to bind remote IPv4 socket"
 msgstr "échec de liaison de la socket IPv4 distante"
 
-#: src/pfwd.c:1621
+#: src/pfwd.c:1833
 msgid "failed to connect remote IPv4 socket"
 msgstr "échec de connexion de la socket IPv4 distante"
 
-#: src/pfwd.c:1643
-msgid "failed to create remote UNIX socket"
-msgstr "échec de création de la socket UNIX distante"
+#: src/pfwd.c:1855
+msgid "failed to create remote unix socket"
+msgstr "échec de création de la socket unix distante"
 
-#: src/pfwd.c:1657
-msgid "failed to bind remote UNIX socket"
-msgstr "échec de liaison de la socket UNIX distante"
+#: src/pfwd.c:1869
+msgid "failed to bind remote unix socket"
+msgstr "échec de liaison de la socket unix distante"
 
-#: src/pfwd.c:1669
-msgid "failed to connect remote UNIX socket"
-msgstr "échec de connexion de la socket UNIX distante"
+#: src/pfwd.c:1881
+msgid "failed to connect remote unix socket"
+msgstr "échec de connexion de la socket unix distante"
 
-#: src/pfwd.c:1696
+#: src/pfwd.c:1908
 msgid "client read watcher created"
 msgstr "observateur de lecture client créé"
 
-#: src/pfwd.c:1703
+#: src/pfwd.c:1915
 msgid "client read watcher started"
 msgstr "observateur de lecture client démarré"
 
-#: src/pfwd.c:1719
+#: src/pfwd.c:1931
 msgid "server read watcher created"
 msgstr "observateur de lecture serveur créé"
 
-#: src/pfwd.c:1726
+#: src/pfwd.c:1938
 msgid "server read watcher started"
 msgstr "observateur de lecture serveur démarré"
 
-#: src/pfwd.c:1731 src/pfwd.c:1737 src/pfwd.c:1743
+#: src/pfwd.c:1943 src/pfwd.c:1949 src/pfwd.c:1955
 msgid "new client connection"
 msgstr "nouvelle connection client"
 
-#: src/pfwd.c:1751
+#: src/pfwd.c:1963
 msgid "new read event"
 msgstr "nouvel évènement de lecture"
 
-#: src/pfwd.c:1758
+#: src/pfwd.c:1970
 msgid "no data found, ignoring read event"
 msgstr "pas de données trouvées, évènement de lecture ignoré"
 
-#: src/pfwd.c:1764
+#: src/pfwd.c:1976
 msgid "read event data"
 msgstr "données de l'évènement de lecture"
 
-#: src/pfwd.c:1769
+#: src/pfwd.c:1981
 msgid "bytes readed"
 msgstr "octets lus"
 
-#: src/pfwd.c:1776
+#: src/pfwd.c:1988
 msgid "read error"
 msgstr "erreur de lecture"
 
-#: src/pfwd.c:1785
+#: src/pfwd.c:1997
 msgid "read watcher stopped"
 msgstr "observateur de lecture stoppé"
 
-#: src/pfwd.c:1795 src/pfwd.c:1801 src/pfwd.c:1807
+#: src/pfwd.c:2007 src/pfwd.c:2013 src/pfwd.c:2019
 msgid "client connection closed"
 msgstr "connection client fermée"
 
-#: src/pfwd.c:1814
+#: src/pfwd.c:2026
 msgid "server connection closed"
 msgstr "connection serveur fermée"
 
-#: src/pfwd.c:1840
+#: src/pfwd.c:2052
 msgid "bytes written"
 msgstr "octets écrits"
 
-#: src/pfwd.c:1846
+#: src/pfwd.c:2058
 msgid "write error"
 msgstr "erreur d'écriture"
 
-#: src/pfwd.c:1873
+#: src/pfwd.c:2082
 msgid "IP address matches deny rule"
 msgstr "l'adresse IP correspond à une règle d'autorisation"
 
-#: src/pfwd.c:1888
+#: src/pfwd.c:2097
 msgid "IP address matches allow rule"
 msgstr "l'adresse IP correspond à une règle d'interdiction"
 
-#: src/pfwd.c:1897
+#: src/pfwd.c:2106
 msgid "IP address matches default deny rule"
 msgstr "l'adresse IP correspond à la régle d'interdiction par défaut"
 
-#: src/pfwd.c:1902
+#: src/pfwd.c:2111
 msgid "IP address matches default allow rule"
 msgstr "l'adresse IP correspond à la règle d'autorisation par défaut"
 
-#: src/pfwd.c:1930
-msgid "read configuration from file"
+#: src/pfwd.c:2150
+msgid "Read configuration from file"
 msgstr "lire la configuration depuis le fichier"
 
-#: src/pfwd.c:1930
-msgid "file"
-msgstr "fichier"
+#: src/pfwd.c:2150
+msgid "FILE"
+msgstr "FICHIER"
 
-#: src/pfwd.c:1932
-msgid "set verbose output"
-msgstr "fixe le niveau de verbosité"
+#: src/pfwd.c:2152
+msgid "Set verbose output"
+msgstr "Fixe le niveau de verbosité"
 
-#: src/pfwd.c:1934
-msgid "show version information"
-msgstr "affiche les informations de version"
+#: src/pfwd.c:2154
+msgid "Show version information"
+msgstr "Affiche les informations de version"
 
-#: src/pfwd.c:1968
+#: src/pfwd.c:2159
+msgid "Local address"
+msgstr "Adresse locale"
+
+#: src/pfwd.c:2159 src/pfwd.c:2171
+msgid "ADDRESS"
+msgstr "ADRESSE"
+
+#: src/pfwd.c:2161
+msgid "Local port"
+msgstr "Port local"
+
+#: src/pfwd.c:2161 src/pfwd.c:2173
+msgid "PORT"
+msgstr "PORT"
+
+#: src/pfwd.c:2163
+msgid "Local socket backlog"
+msgstr "Taille de la file d'attente de connexions de la socket locale"
+
+#: src/pfwd.c:2163
+msgid "LENGTH"
+msgstr "TAILLE"
+
+#: src/pfwd.c:2165
+msgid "User of the local unix socket"
+msgstr "Echec de création de la socket unix locale"
+
+#: src/pfwd.c:2165 src/pfwd.c:2167
+msgid "NAME"
+msgstr "NOM"
+
+#: src/pfwd.c:2167
+msgid "Group of the local unix socket"
+msgstr "Groupe de la socket unix locale"
+
+#: src/pfwd.c:2169
+msgid "Mode of the local unix socket"
+msgstr "Echec de création de la socket unix locale"
+
+#: src/pfwd.c:2169
+msgid "MODE"
+msgstr "MODE"
+
+#: src/pfwd.c:2171
+msgid "Forward address"
+msgstr "Adresse de redirection"
+
+#: src/pfwd.c:2173
+msgid "Forward port"
+msgstr "Port de redirection"
+
+#: src/pfwd.c:2175
+msgid "Socket buffer size"
+msgstr "Taille de buffer socket"
+
+#: src/pfwd.c:2175
+msgid "SIZE"
+msgstr "TAILLE"
+
+#: src/pfwd.c:2178
+msgid "[FORWARDER]"
+msgstr "[REDIRECTION]"
+
+#: src/pfwd.c:2180
+msgid "forwarder"
+msgstr "redirection"
+
+#: src/pfwd.c:2180
+msgid "Forwarder Options"
+msgstr "Options Redirection"
+
+#: src/pfwd.c:2181
+msgid "Show all forwarder options"
+msgstr "Afficher toutes les options d'une redirection"
+
+#: src/pfwd.c:2268
 msgid "The configuration file doesn't exist or cannot be read."
 msgstr "Le fichier de configuration n'existe pas ou ne peut être lu."
 
-#: src/pfwd.c:1979
+#: src/pfwd.c:2280
 msgid "SIGPIPE received, continuing execution"
 msgstr "SIGPIPE reçu, poursuite de l'exécution"
 
-#: src/pfwd.c:1985
+#: src/pfwd.c:2286
 msgid "SIGHUP received, reloading configuration"
 msgstr "SIGHUP reçu, rechargement de la configuration"
 
-#: src/pfwd.c:1993
+#: src/pfwd.c:2294
 msgid "SIGINT received, exiting"
 msgstr "SIGINT reçu, abandon de l'exécution"
 
-#: src/pfwd.c:2001
+#: src/pfwd.c:2302
 msgid "SIGTERM received, exiting"
 msgstr "SIGTERM reçu, abandon de l'exécution"
 
-#: src/pfwd.c:2013
+#: src/pfwd.c:2313
 msgid "cleanup"
 msgstr "nettoyage"
 
-#: src/pfwd.c:2044
+#: src/pfwd.c:2344
 msgid "daemon stopped"
 msgstr "démon stoppé"
 
-#: src/pfwd.c:2109
+#: src/pfwd.c:2396
+msgid "GLib version 2.6.0 or above is needed"
+msgstr "La librairie GLib version 2.6.0 ou supérieure est requise"
+
+#: src/pfwd.c:2414
 msgid "Failed to create events logger."
 msgstr "Echec de création du journaliseur d'évènements."
 
-#: src/pfwd.c:2163
+#: src/pfwd.c:2468
 msgid "failed to daemonize, error code"
 msgstr "échec de démonisation, code d'erreur"
 
-#: src/pfwd.c:2169
+#: src/pfwd.c:2474
 msgid "daemon started"
 msgstr "démon démarré"

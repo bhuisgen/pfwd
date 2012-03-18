@@ -1,5 +1,5 @@
 /*
- * pfwd - a port forwarding server
+ * pfwd - a port forwarding tool
  *
  * Copyright 2011 Boris HUISGEN <bhuisgen@hbis.fr>
  *
@@ -41,10 +41,10 @@
 #include <string.h>
 #include <ev.h>
 
-#define LOG_ERROR(_fmt, ...)    log_message(app->logger, LOG_LEVEL_ERROR, _fmt, __VA_ARGS__)
-#define LOG_INFO(_fmt, ...)     log_message(app->logger, LOG_LEVEL_INFO, _fmt, __VA_ARGS__)
+#define LOG_ERROR(_fmt, ...)    if (app->logger) log_message(app->logger, LOG_LEVEL_ERROR, _fmt, __VA_ARGS__)
+#define LOG_INFO(_fmt, ...)     if (app->logger) log_message(app->logger, LOG_LEVEL_INFO, _fmt, __VA_ARGS__)
 #ifdef DEBUG
-#define LOG_DEBUG(_fmt, ...)    log_message(app->logger, LOG_LEVEL_DEBUG, _fmt, __VA_ARGS__)
+#define LOG_DEBUG(_fmt, ...)    if (app->logger) log_message(app->logger, LOG_LEVEL_DEBUG, _fmt, __VA_ARGS__)
 #else
 #define LOG_DEBUG(_fmt, ...)
 #endif
@@ -152,8 +152,8 @@ get_default_config_file(const gchar *file)
     {
       g_free(config_file);
 
-      config_file = g_build_path(G_DIR_SEPARATOR_S, SYSCONFDIR, PFWD_CONFIGFILE, NULL);
-    }
+config_file    = g_build_path(G_DIR_SEPARATOR_S, SYSCONFDIR, PFWD_CONFIGFILE, NULL);
+  }
 
   if (g_access(config_file, R_OK))
     {
@@ -177,8 +177,8 @@ load_config()
       &error);
   if (error)
     {
-      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in configuration file"),
-          error->message);
+      g_printerr("%s: %s (%s)\n", app->config_file,
+          N_("error in configuration file"), error->message);
 
       g_error_free(error);
       error = NULL;
@@ -191,15 +191,16 @@ load_config()
   group = g_key_file_get_start_group(app->settings);
   if (!group)
     {
-      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in configuration file"),
-          N_("no group 'main'"));
+      g_printerr("%s: %s (%s)\n", app->config_file,
+          N_("error in configuration file"), N_("no group 'main'"));
 
       return FALSE;
     }
 
   if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
     {
-      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in configuration file"),
+      g_printerr("%s: %s (%s)\n", app->config_file,
+          N_("error in configuration file"),
           N_("the first group is not 'main'"));
 
       g_free(group);
@@ -225,8 +226,7 @@ reload_config()
   if (error)
     {
       LOG_ERROR("%s: %s (%s)\n",
-          app->config_file, N_("error in configuration file, aborting reload"),
-          error->message);
+          app->config_file, N_("error in configuration file, aborting reload"), error->message);
 
       g_error_free(error);
       error = NULL;
@@ -241,8 +241,7 @@ reload_config()
   if (!group)
     {
       LOG_ERROR("%s: %s (%s)\n",
-          app->config_file, N_("error in configuration file"),
-          N_("no group 'main'"));
+          app->config_file, N_("error in configuration file"), N_("no group 'main'"));
 
       g_key_file_free(settings);
 
@@ -252,8 +251,7 @@ reload_config()
   if (g_strcmp0(group, CONFIG_GROUP_MAIN) != 0)
     {
       LOG_ERROR("%s: %s (%s)\n",
-          app->config_file, N_("error in configuration file"),
-          N_("the first group is not 'main'"));
+          app->config_file, N_("error in configuration file"), N_("the first group is not 'main'"));
 
       g_free(group);
       g_key_file_free(settings);
@@ -287,11 +285,10 @@ init_pfwds()
   regex_unix = g_regex_new("^unix:(.+)$", 0, 0, NULL);
 
   groups = g_key_file_get_groups(app->settings, &len);
-
   if (len < 2)
     {
-      g_printerr("%s: %s (%s)\n", app->config_file, N_("error in configuration file"),
-          N_("no redirector group"));
+      g_printerr("%s: %s (%s)\n", app->config_file,
+          N_("error in configuration file"), N_("no forwarder group"));
 
       g_strfreev(groups);
       g_regex_unref(regex_unix);
@@ -432,7 +429,7 @@ init_pfwds()
           path = g_match_info_fetch(match_info, 1);
           if (!path)
             {
-              g_printerr("%s: %s\n", pfw->name, N_("invalid UNIX listen path"));
+              g_printerr("%s: %s\n", pfw->name, N_("invalid unix listen path"));
 
               g_match_info_free(match_info);
               g_free(value);
@@ -451,6 +448,21 @@ init_pfwds()
 
       g_match_info_free(match_info);
       g_free(value);
+
+      if (pfw->listen_af == AF_UNSPEC)
+        {
+          g_printerr("%s: %s\n", pfw->name,
+              N_("invalid listen address format"));
+
+          g_free(pfw->listen);
+          g_free(pfw);
+          g_strfreev(groups);
+          g_regex_unref(regex_unix);
+          g_regex_unref(regex_ipv4);
+          g_regex_unref(regex_ipv6);
+
+          return NULL;
+        }
 
       if (pfw->listen_af != AF_UNIX)
         {
@@ -490,7 +502,15 @@ init_pfwds()
             }
           if (pfw->listen_backlog <= 0)
             {
-              g_printerr("%s: %s\n", pfw->name, N_("invalid listen socket backlog"));
+              g_printerr("%s: %s\n", pfw->name,
+                  N_("invalid listen socket backlog"));
+
+              g_free(pfw->listen);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return NULL;
             }
@@ -510,10 +530,21 @@ init_pfwds()
           if (pfw->listen_owner)
             {
               struct passwd *pwd;
+              uid_t uid;
+              char *err;
 
               if ((getuid() != 0) && (geteuid() != 0))
                 {
-                  g_printerr("%s: %s\n", pfw->name, N_("listen socket owner cannot be changed"));
+                  g_printerr("%s: %s\n", pfw->name,
+                      N_("listen socket owner cannot be changed"));
+
+                  g_free(pfw->listen_owner);
+                  g_free(pfw->listen);
+                  g_free(pfw);
+                  g_strfreev(groups);
+                  g_regex_unref(regex_unix);
+                  g_regex_unref(regex_ipv4);
+                  g_regex_unref(regex_ipv6);
 
                   return FALSE;
                 }
@@ -521,9 +552,40 @@ init_pfwds()
               pwd = getpwnam(pfw->listen_owner);
               if (!pwd)
                 {
-                  g_printerr("%s: %s\n", pfw->name, N_("invalid listen socket owner"));
+                  uid = (uid_t) strtol(pfw->listen_owner, &err, 10);
+                  if ((err == pfw->listen_owner) || (errno == ERANGE)
+                      || (errno == EINVAL))
+                    {
+                      g_printerr("%s: %s\n", pfw->name,
+                          N_("invalid listen socket owner"));
 
-                  return FALSE;
+                      g_free(pfw->listen_owner);
+                      g_free(pfw->listen);
+                      g_free(pfw);
+                      g_strfreev(groups);
+                      g_regex_unref(regex_unix);
+                      g_regex_unref(regex_ipv4);
+                      g_regex_unref(regex_ipv6);
+
+                      return FALSE;
+                    }
+
+                  pwd = getpwuid(uid);
+                  if (!pwd)
+                    {
+                      g_printerr("%s: %s\n", pfw->name,
+                          N_("invalid listen socket owner"));
+
+                      g_free(pfw->listen_owner);
+                      g_free(pfw->listen);
+                      g_free(pfw);
+                      g_strfreev(groups);
+                      g_regex_unref(regex_unix);
+                      g_regex_unref(regex_ipv4);
+                      g_regex_unref(regex_ipv6);
+
+                      return FALSE;
+                    }
                 }
             }
 
@@ -537,10 +599,22 @@ init_pfwds()
           if (pfw->listen_group)
             {
               struct group *grp;
+              gid_t gid;
+              char *err;
 
               if ((getuid() != 0) && (geteuid() != 0))
                 {
-                  g_printerr("%s: %s\n", pfw->name, N_("listen socket group cannot be changed"));
+                  g_printerr("%s: %s\n", pfw->name,
+                      N_("listen socket group cannot be changed"));
+
+                  g_free(pfw->listen_group);
+                  g_free(pfw->listen_owner);
+                  g_free(pfw->listen);
+                  g_free(pfw);
+                  g_strfreev(groups);
+                  g_regex_unref(regex_unix);
+                  g_regex_unref(regex_ipv4);
+                  g_regex_unref(regex_ipv6);
 
                   return FALSE;
                 }
@@ -548,22 +622,75 @@ init_pfwds()
               grp = getgrnam(pfw->listen_group);
               if (!grp)
                 {
-                  g_printerr("%s: %s\n", pfw->name, N_("invalid listen socket group"));
+                  gid = (gid_t) strtol(pfw->listen_group, &err, 10);
+                  if ((err == pfw->listen_group) || (errno == ERANGE)
+                      || (errno == EINVAL))
+                    {
+                      g_printerr("%s: %s\n", pfw->name,
+                          N_("invalid listen socket group"));
 
-                  return FALSE;
+                      g_free(pfw->listen_group);
+                      g_free(pfw->listen_owner);
+                      g_free(pfw->listen);
+                      g_free(pfw);
+                      g_strfreev(groups);
+                      g_regex_unref(regex_unix);
+                      g_regex_unref(regex_ipv4);
+                      g_regex_unref(regex_ipv6);
+
+                      return FALSE;
+                    }
+
+                  grp = getgrgid(gid);
+                  if (!grp)
+                    {
+                      g_printerr("%s: %s\n", pfw->name,
+                          N_("invalid listen socket group"));
+
+                      g_free(pfw->listen_group);
+                      g_free(pfw->listen_owner);
+                      g_free(pfw->listen);
+                      g_free(pfw);
+                      g_strfreev(groups);
+                      g_regex_unref(regex_unix);
+                      g_regex_unref(regex_ipv4);
+                      g_regex_unref(regex_ipv6);
+
+                      return FALSE;
+                    }
                 }
             }
+
           if (pfw->listen_owner && !pfw->listen_group)
             {
               g_printerr("%s: %s\n", pfw->name,
                   N_("listen socket group is not present"));
 
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
+              g_free(pfw->listen);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
+
               return FALSE;
             }
+
           if (!pfw->listen_owner && pfw->listen_group)
             {
               g_printerr("%s: %s\n", pfw->name,
                   N_("listen socket owner is not present"));
+
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
+              g_free(pfw->listen);
+              g_free(pfw);
+              g_strfreev(groups);
+              g_regex_unref(regex_unix);
+              g_regex_unref(regex_ipv4);
+              g_regex_unref(regex_ipv6);
 
               return FALSE;
             }
@@ -581,7 +708,17 @@ init_pfwds()
               g_free(listen_mode);
               if (errno == ERANGE)
                 {
-                  g_printerr("%s: %s\n", pfw->name, N_("invalid listen socket mode"));
+                  g_printerr("%s: %s\n", pfw->name,
+                      N_("invalid listen socket mode"));
+
+                  g_free(pfw->listen_group);
+                  g_free(pfw->listen_owner);
+                  g_free(pfw->listen);
+                  g_free(pfw);
+                  g_strfreev(groups);
+                  g_regex_unref(regex_unix);
+                  g_regex_unref(regex_ipv4);
+                  g_regex_unref(regex_ipv6);
 
                   return NULL;
                 }
@@ -598,6 +735,9 @@ init_pfwds()
 
           g_error_free(error);
           error = NULL;
+
+          g_free(pfw->listen_group);
+          g_free(pfw->listen_owner);
           g_free(pfw->listen);
           g_free(pfw);
           g_strfreev(groups);
@@ -621,6 +761,8 @@ init_pfwds()
 
               g_match_info_free(match_info);
               g_free(value);
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
               g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
@@ -640,6 +782,8 @@ init_pfwds()
               g_free(ipv6);
               g_match_info_free(match_info);
               g_free(value);
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
               g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
@@ -669,6 +813,8 @@ init_pfwds()
 
               g_match_info_free(match_info);
               g_free(value);
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
               g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
@@ -690,6 +836,8 @@ init_pfwds()
                   g_free(ipv4);
                   g_match_info_free(match_info);
                   g_free(value);
+                  g_free(pfw->listen_group);
+                  g_free(pfw->listen_owner);
                   g_free(pfw->listen);
                   g_free(pfw);
                   g_strfreev(groups);
@@ -715,10 +863,12 @@ init_pfwds()
           if (!path)
             {
               g_printerr("%s: %s\n", pfw->name,
-                  N_("invalid UNIX forward path"));
+                  N_("invalid unix forward path"));
 
               g_match_info_free(match_info);
               g_free(value);
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
               g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
@@ -736,6 +886,24 @@ init_pfwds()
       g_match_info_free(match_info);
       g_free(value);
 
+      if (pfw->forward_af == AF_UNSPEC)
+        {
+          g_printerr("%s: %s\n", pfw->name,
+              N_("invalid forward address format"));
+
+          g_free(pfw->forward);
+          g_free(pfw->listen_group);
+          g_free(pfw->listen_owner);
+          g_free(pfw->listen);
+          g_free(pfw);
+          g_strfreev(groups);
+          g_regex_unref(regex_unix);
+          g_regex_unref(regex_ipv4);
+          g_regex_unref(regex_ipv6);
+
+          return NULL;
+        }
+
       if (pfw->forward_af != AF_UNIX)
         {
           pfw->forward_port = g_key_file_get_integer(app->settings, pfw->name,
@@ -751,6 +919,8 @@ init_pfwds()
                 }
 
               g_free(pfw->forward);
+              g_free(pfw->listen_group);
+              g_free(pfw->listen_owner);
               g_free(pfw->listen);
               g_free(pfw);
               g_strfreev(groups);
@@ -824,19 +994,9 @@ init_logger()
     }
   if (daemon)
     {
-      gboolean use_syslog;
       gint log_level;
+      gboolean use_syslog;
       LoggerLevel level = LOGGER_LEVEL_NONE;
-
-      use_syslog = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
-          CONFIG_KEY_MAIN_USESYSLOG, &error);
-      if (error)
-        {
-          use_syslog = CONFIG_KEY_MAIN_USESYSLOG_DEFAULT;
-
-          g_error_free(error);
-          error = NULL;
-        }
 
       log_level = g_key_file_get_integer(app->settings, CONFIG_GROUP_MAIN,
           CONFIG_KEY_MAIN_LOGLEVEL, &error);
@@ -871,6 +1031,16 @@ init_logger()
         break;
         }
 
+      use_syslog = g_key_file_get_boolean(app->settings, CONFIG_GROUP_MAIN,
+          CONFIG_KEY_MAIN_USESYSLOG, &error);
+      if (error)
+        {
+          use_syslog = CONFIG_KEY_MAIN_USESYSLOG_DEFAULT;
+
+          g_error_free(error);
+          error = NULL;
+        }
+
       if (use_syslog)
         {
           gchar *syslog_facility;
@@ -893,8 +1063,8 @@ init_logger()
               return NULL;
             }
 
-          if (!log_handler_set_option(handler,
-              LOG_HANDLER_SYSLOG_OPTION_FACILITY, syslog_facility))
+          if (log_handler_set_option(handler,
+              LOG_HANDLER_SYSLOG_OPTION_FACILITY, syslog_facility) != 0)
             {
               log_handler_destroy(handler);
               g_free(syslog_facility);
@@ -960,11 +1130,18 @@ init_logger()
       if (!handler)
         return NULL;
 
+      if (app->verbose)
+        {
 #ifdef DEBUG
-      logger = log_create_logger(handler, LOGGER_LEVEL_ALL);
+          logger = log_create_logger(handler, LOGGER_LEVEL_ALL);
 #else
-      logger = log_create_logger(handler, LOGGER_LEVEL_INFO);
+          logger = log_create_logger(handler, LOGGER_LEVEL_INFO);
 #endif
+        }
+      else
+        {
+          logger = log_create_logger(handler, LOGGER_LEVEL_ERROR);
+        }
       if (!logger)
         {
           log_handler_destroy(handler);
@@ -1031,7 +1208,7 @@ exit_main_loop(void)
 static gboolean
 start_pfwd(pfw_t *pfw)
 {
-  LOG_DEBUG("%s: %s", pfw->name, "starting redirector");
+  LOG_DEBUG("%s: %s", pfw->name, "starting forwarder");
 
   pfw->ev_loop = ev_default_loop(EVFLAG_AUTO);
   if (!pfw->ev_loop)
@@ -1147,7 +1324,7 @@ start_pfwd(pfw_t *pfw)
       if (pfw->fd < 0)
         {
           LOG_ERROR("%s: %s",
-              pfw->name, N_("failed to create local UNIX socket"));
+              pfw->name, N_("failed to create local unix socket"));
 
           return FALSE;
         }
@@ -1156,7 +1333,7 @@ start_pfwd(pfw_t *pfw)
           < 0)
         {
           LOG_ERROR("%s: %s",
-              pfw->name, N_("failed to bind local UNIX socket"));
+              pfw->name, N_("failed to bind local unix socket"));
 
           return FALSE;
         }
@@ -1164,7 +1341,7 @@ start_pfwd(pfw_t *pfw)
       if (listen(pfw->fd, pfw->listen_backlog) < 0)
         {
           LOG_ERROR("%s: %s",
-              pfw->name, N_("failed to listen on local UNIX socket"));
+              pfw->name, N_("failed to listen on local unix socket"));
 
           return FALSE;
         }
@@ -1176,29 +1353,64 @@ start_pfwd(pfw_t *pfw)
         {
           struct passwd *pwd;
           struct group *grp;
+          char *err;
+          uid_t uid;
+          gid_t gid;
 
           pwd = getpwnam(pfw->listen_owner);
           if (!pwd)
             {
-              LOG_ERROR("%s: %s",
-                  pfw->name, N_("failed to get the UNIX socket UID"));
+              LOG_DEBUG("%s: %s",
+                  pfw->name, N_("failed to retrieve the user name, trying the user id"));
 
-              return FALSE;
+              uid = (uid_t) strtol(pfw->listen_owner, &err, 10);
+              if ((err == pfw->listen_owner) || (errno == ERANGE)
+                  || (errno == EINVAL))
+                {
+                  LOG_DEBUG("%s", N_("invalid value"));
+
+                  return FALSE;
+                }
+
+              pwd = getpwuid(uid);
+              if (!pwd)
+                {
+                  LOG_ERROR("%s",
+                      N_("failed to retrieve the local unix socket owner"));
+
+                  return FALSE;
+                }
             }
 
           grp = getgrnam(pfw->listen_group);
           if (!grp)
             {
-              LOG_ERROR("%s: %s",
-                  pfw->name, N_("failed to get the UNIX socket GID"));
+              LOG_DEBUG("%s: %s",
+                  pfw->name, N_("failed to retrieve the group name, trying the group id"));
 
-              return FALSE;
+              gid = (gid_t) strtol(pfw->listen_group, &err, 10);
+              if ((err == pfw->listen_group) || (errno == ERANGE)
+                  || (errno == EINVAL))
+                {
+                  LOG_DEBUG("%s", N_("invalid value"));
+
+                  return FALSE;
+                }
+
+              grp = getgrgid(gid);
+              if (!grp)
+                {
+                  LOG_ERROR("%s",
+                      N_("failed to retrieve the local unix socket group"));
+
+                  return FALSE;
+                }
             }
 
           if (chown(pfw->listen, pwd->pw_uid, grp->gr_gid))
             {
               LOG_ERROR("%s: %s",
-                  pfw->name, N_("failed to set the UNIX socket UID/GID"));
+                  pfw->name, N_("failed to set the local unix socket owner/group"));
 
               return FALSE;
             }
@@ -1209,7 +1421,7 @@ start_pfwd(pfw_t *pfw)
           if (g_chmod(pfw->listen, pfw->listen_mode) == -1)
             {
               LOG_ERROR("%s: %s",
-                  pfw->name, N_("failed to set rights on local UNIX socket"));
+                  pfw->name, N_("failed to set the local unix socket rights"));
 
               return FALSE;
             }
@@ -1247,7 +1459,7 @@ start_pfwd(pfw_t *pfw)
 static void
 stop_pfwd(pfw_t *pfw)
 {
-  LOG_DEBUG("%s: %s", pfw->name, "stopping redirector");
+  LOG_DEBUG("%s: %s", pfw->name, "stopping forwarder");
 
   if (pfw->w)
     {
@@ -1350,7 +1562,7 @@ stop_pfwd(pfw_t *pfw)
         {
           unlink(pfw->listen);
 
-          LOG_DEBUG("%s: %s", pfw->name, N_("UNIX socket file deleted"));
+          LOG_DEBUG("%s: %s", pfw->name, N_("unix socket file deleted"));
         }
 
       if (pfw->listen_af == AF_INET6)
@@ -1511,7 +1723,7 @@ pfwd_accept_event(EV_P_ ev_io *w, gint revents)
         if (c < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to accept new UNIX client"));
+                pfw->name, N_("failed to accept new unix client"));
 
             return;
           }
@@ -1640,7 +1852,7 @@ pfwd_accept_event(EV_P_ ev_io *w, gint revents)
         if (s < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to create remote UNIX socket"));
+                pfw->name, N_("failed to create remote unix socket"));
 
             close(c);
 
@@ -1654,7 +1866,7 @@ pfwd_accept_event(EV_P_ ev_io *w, gint revents)
         if (bind(s, (struct sockaddr *) &sun, sizeof(struct sockaddr_un)) < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to bind remote UNIX socket"));
+                pfw->name, N_("failed to bind remote unix socket"));
 
             close(s);
             close(c);
@@ -1666,7 +1878,7 @@ pfwd_accept_event(EV_P_ ev_io *w, gint revents)
             < 0)
           {
             LOG_ERROR("%s: %s",
-                pfw->name, N_("failed to connect remote UNIX socket"));
+                pfw->name, N_("failed to connect remote unix socket"));
 
             close(s);
             close(c);
@@ -1858,14 +2070,11 @@ pfwd_read_event(EV_P_ ev_io *w, gint revents)
 static gboolean
 pfwd_check_access(pfw_t *pfw, gchar *ip)
 {
-  gboolean deny = FALSE;
   gboolean allow = FALSE;
   gint i;
 
   if (pfw->deny_ips)
     {
-      deny = TRUE;
-
       for (i = 0; pfw->deny_ips[i] != NULL; i++)
         {
           if (g_pattern_match_simple(pfw->deny_ips[i], ip))
@@ -1918,24 +2127,62 @@ void
 parse_command_line(gint argc, gchar *argv[])
 {
   GOptionContext *context;
+  GOptionGroup *forwarder;
   GError *error = NULL;
   gchar *help;
+  gchar *current_dir, *file;
   gchar *config_file = NULL;
   gboolean verbose = FALSE;
   gint show_version = 0;
+  gchar *forwarder_listen = NULL;
+  gint forwarder_listenport = -1;
+  gint forwarder_listenbacklog = CONFIG_KEY_PFW_LISTENBACKLOG_DEFAULT;
+  gchar *forwarder_listenowner = NULL;
+  gchar *forwarder_listengroup = NULL;
+  gchar *forwarder_listenmode = NULL;
+  gchar *forwarder_forward = NULL;
+  gint forwarder_forwardport = -1;
+  gint forwarder_buffersize = CONFIG_KEY_PFW_BUFFERSIZE_DEFAULT;
 
-  GOptionEntry entries[] =
+  GOptionEntry main_entries[] =
     {
-      { "file", 'f', 0, G_OPTION_ARG_FILENAME, &config_file,
-          N_("read configuration from file"), N_("file") },
-          { "verbose", 'v', 0, G_OPTION_ARG_NONE, &verbose,
-              N_("set verbose output") },
-          { "version", 0, 0, G_OPTION_ARG_NONE, &show_version,
-              N_("show version information"), NULL },
-          { NULL } };
+      { "file", 'f', G_OPTION_FLAG_IN_MAIN, G_OPTION_ARG_FILENAME, &config_file,
+          N_("Read configuration from file"), N_("FILE") },
+      { "verbose", 'v', G_OPTION_FLAG_IN_MAIN, G_OPTION_ARG_NONE, &verbose,
+          N_("Set verbose output") },
+      { "version", 0, G_OPTION_FLAG_IN_MAIN, G_OPTION_ARG_NONE, &show_version,
+          N_("Show version information"), NULL },
+      { NULL } };
+  GOptionEntry forwarder_entries[] =
+    {
+      { "listen", 0, 0, G_OPTION_ARG_STRING, &forwarder_listen,
+          N_("Local address"), N_("ADDRESS") },
+      { "listen-port", 0, 0, G_OPTION_ARG_INT, &forwarder_listenport,
+          N_("Local port"), N_("PORT") },
+      { "listen-backlog", 0, 0, G_OPTION_ARG_INT, &forwarder_listenbacklog,
+          N_("Local socket backlog"), N_("LENGTH") },
+      { "listen-owner", 0, 0, G_OPTION_ARG_STRING, &forwarder_listenowner,
+          N_("User of the local unix socket"), N_("NAME") },
+      { "listen-group", 0, 0, G_OPTION_ARG_STRING, &forwarder_listengroup,
+          N_("Group of the local unix socket"), N_("NAME") },
+      { "listen-mode", 0, 0, G_OPTION_ARG_STRING, &forwarder_listenmode,
+          N_("Mode of the local unix socket"), N_("MODE") },
+      { "forward", 0, 0, G_OPTION_ARG_STRING, &forwarder_forward,
+          N_("Forward address"), N_("ADDRESS") },
+      { "forward-port", 0, 0, G_OPTION_ARG_INT, &forwarder_forwardport,
+          N_("Forward port"), N_("PORT") },
+      { "buffersize", 0, 0, G_OPTION_ARG_INT, &forwarder_buffersize,
+          N_("Socket buffer size"), N_("SIZE") },
+      { NULL } };
 
-  context = g_option_context_new(NULL);
-  g_option_context_add_main_entries(context, entries, PACKAGE);
+  context = g_option_context_new(N_("[FORWARDER]"));
+
+  forwarder = g_option_group_new(N_("forwarder"), N_("Forwarder Options"),
+      N_("Show all forwarder options"), NULL, NULL);
+  g_option_group_add_entries(forwarder, forwarder_entries);
+  g_option_context_add_group(context, forwarder);
+
+  g_option_context_add_main_entries(context, main_entries, PACKAGE);
 
   g_option_context_parse(context, &argc, &argv, &error);
   if (error)
@@ -1961,13 +2208,67 @@ parse_command_line(gint argc, gchar *argv[])
       exit(0);
     }
 
-  app->config_file = get_default_config_file(config_file);
-  if (!app->config_file)
+  if (forwarder_listen || forwarder_forward)
     {
-      g_printerr("%s\n",
-          N_("The configuration file doesn't exist or cannot be read."));
+      app->settings = g_key_file_new();
 
-      exit(1);
+      g_key_file_set_boolean(app->settings, CONFIG_GROUP_MAIN,
+          CONFIG_KEY_MAIN_DAEMONIZE, CONFIG_KEY_MAIN_DAEMONIZE_NO);
+
+      if (forwarder_listen)
+        g_key_file_set_string(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PFW_LISTEN, forwarder_listen);
+
+      g_key_file_set_integer(app->settings, CONFIG_GROUP_PFW,
+          CONFIG_KEY_PFW_LISTENPORT, forwarder_listenport);
+
+      g_key_file_set_integer(app->settings, CONFIG_GROUP_PFW,
+          CONFIG_KEY_PFW_LISTENBACKLOG, forwarder_listenbacklog);
+
+      if (forwarder_listenowner)
+        g_key_file_set_string(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PFW_LISTENOWNER, forwarder_listenowner);
+
+      if (forwarder_listengroup)
+        g_key_file_set_string(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PFW_LISTENGROUP, forwarder_listengroup);
+
+      if (forwarder_listenmode)
+        g_key_file_set_string(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PWD_LISTENMODE, forwarder_listenmode);
+
+      if (forwarder_forward)
+        g_key_file_set_string(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PFW_FORWARD, forwarder_forward);
+
+      if (forwarder_forwardport)
+        g_key_file_set_integer(app->settings, CONFIG_GROUP_PFW,
+            CONFIG_KEY_PFW_FORWARDPORT, forwarder_forwardport);
+
+      g_key_file_set_integer(app->settings, CONFIG_GROUP_PFW,
+          CONFIG_KEY_PFW_BUFFERSIZE, forwarder_buffersize);
+    }
+  else
+    {
+      if (config_file && !g_path_is_absolute(config_file))
+        {
+          current_dir = g_get_current_dir();
+          file = g_build_filename(current_dir, config_file, NULL);
+
+          g_free(current_dir);
+          g_free(config_file);
+
+          config_file = file;
+        }
+
+      app->config_file = get_default_config_file(config_file);
+      if (!app->config_file)
+        {
+          g_printerr("%s\n",
+              N_("The configuration file doesn't exist or cannot be read."));
+
+          exit(1);
+        }
     }
 
   app->verbose = verbose;
@@ -2009,8 +2310,7 @@ cleanup(void)
   GError *error = NULL;
   gboolean daemon;
 
-  if (app->logger)
-    LOG_DEBUG("%s", N_("cleanup"));
+  LOG_DEBUG("%s", N_("cleanup"));
 
   if (app->settings && app->daemon)
     {
@@ -2091,12 +2391,17 @@ main(gint argc, gchar *argv[])
   bindtextdomain(PACKAGE, LOCALEDIR);
   textdomain(PACKAGE);
 
+  if (glib_check_version(2, 6, 0))
+    {
+      g_error(N_("GLib version 2.6.0 or above is needed"));
+    }
+
   app = g_new0(application_t, 1);
   atexit(cleanup);
 
   parse_command_line(argc, argv);
 
-  if (!load_config())
+  if (app->config_file && !load_config())
     exit(2);
 
   app->pfwds = init_pfwds();
@@ -2170,9 +2475,11 @@ main(gint argc, gchar *argv[])
     }
 
   signal(SIGPIPE, sigpipe);
-  signal(SIGHUP, sighup);
   signal(SIGINT, sigint);
   signal(SIGTERM, sigterm);
+
+  if (app->daemon)
+    signal(SIGHUP, sighup);
 
   if (!run_main_loop())
     exit(6);

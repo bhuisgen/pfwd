@@ -1,5 +1,5 @@
 /*
- * pfwd - a port forwarding server
+ * pfwd - a port forwarding tool
  *
  * Copyright 2011 Boris HUISGEN <bhuisgen@hbis.fr>
  *
